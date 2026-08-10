@@ -254,14 +254,49 @@ export default function Dashboard() {
   // Saved leads state
   const [savedLeadKeys, setSavedLeadKeys] = useState<Set<string>>(new Set());
 
-  // Results & Stats
-  const [loading,  setLoading]  = useState(false);
-  const [result,   setResult]   = useState<SearchResponse | null>(null);
-  const [error,    setError]    = useState("");
-  const [stats,    setStats]    = useState<{total_runs?:number;total_leads?:number;last_run?:string}|null>(null);
+  // Results & Stats & Cache
+  const [loading,          setLoading]          = useState(false);
+  const [result,           setResult]           = useState<SearchResponse | null>(null);
+  const [isCachedResults,  setIsCachedResults]  = useState(false);
+  const [error,            setError]            = useState("");
+  const [stats,            setStats]            = useState<{total_runs?:number;total_leads?:number;last_run?:string}|null>(null);
+
+  const loadCachedFallback = useCallback(() => {
+    try {
+      const cached = localStorage.getItem("xts_last_results");
+      if (cached) {
+        const parsed: SearchResponse = JSON.parse(cached);
+        if (parsed && ((parsed.results && parsed.results.length > 0) || (parsed.leads && parsed.leads.length > 0))) {
+          setResult(parsed);
+          setIsCachedResults(true);
+        }
+      }
+    } catch (e) {
+      console.error("Error reading xts_last_results from localStorage:", e);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/stats").then(r => r.json()).then(setStats).catch(() => {});
+
+    // Load cached search results instantly on visit
+    try {
+      const cached = localStorage.getItem("xts_last_results");
+      if (cached) {
+        const parsed: SearchResponse = JSON.parse(cached);
+        if (parsed && ((parsed.results && parsed.results.length > 0) || (parsed.leads && parsed.leads.length > 0))) {
+          setResult(parsed);
+          setIsCachedResults(true);
+          if (parsed.query && searchInputRef.current) {
+            searchInputRef.current.value = parsed.query;
+          }
+          if (parsed.city) setCity(parsed.city);
+          if (parsed.state) setState(parsed.state);
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing xts_last_results:", e);
+    }
 
     // Sync saved leads
     try {
@@ -341,7 +376,8 @@ export default function Dashboard() {
     const CT = ctry ?? country;
 
     if (!Q.trim()) { setError("Enter a search query"); return; }
-    setLoading(true); setError(""); setResult(null);
+    setLoading(true);
+    setError("");
     setShowAutocomplete(false);
 
     try {
@@ -355,8 +391,11 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
+      let data: SearchResponse;
+
       if (!res.ok) {
-        res = await fetch("/api/scrape", {
+        let scrapeRes = await fetch("/api/scrape", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -366,37 +405,41 @@ export default function Dashboard() {
             ...(selectedSources.length < ALL_SOURCES.length ? { sources: selectedSources } : {}),
           }),
         });
-      }
-      const data: SearchResponse = await res.json();
-      setResult(data);
-      if (!data.ok) {
-        setError(data.error ?? "Search failed");
+        data = await scrapeRes.json();
       } else {
+        data = await res.json();
+      }
+
+      if (data.ok && ((data.results && data.results.length > 0) || (data.leads && data.leads.length > 0))) {
+        setResult(data);
+        setIsCachedResults(false);
         try {
-          const resultsCount = (data.results || data.leads || []).length || data.total_results || data.leads_found || 0;
-          const searchLogItem = {
-            query: Q,
-            city: C,
-            state: ST,
-            country: CT,
-            mode: MD,
-            resultsCount,
-            timestamp: new Date().toISOString()
-          };
-          const rawLog = localStorage.getItem("xts_search_log");
-          const searchLogs = rawLog ? JSON.parse(rawLog) : [];
-          searchLogs.push(searchLogItem);
-          localStorage.setItem("xts_search_log", JSON.stringify(searchLogs));
+          
+          // Track search event for analytics
+          try {
+            const log = JSON.parse(localStorage.getItem("xts_search_log") || "[]");
+            log.unshift({ query: Q, city: C, state: ST, country: CT === "CA" ? "Canada" : "US", mode: MD, resultsCount: data?.results?.length || 0, timestamp: new Date().toISOString() });
+            localStorage.setItem("xts_search_log", JSON.stringify(log.slice(0, 200)));
+          } catch {}
+            localStorage.setItem("xts_last_results", JSON.stringify(data));
         } catch (e) {
-          console.error("Failed to append to xts_search_log:", e);
+          console.error("Failed to save xts_last_results:", e);
         }
+      } else if (data.ok) {
+        setResult(data);
+        setIsCachedResults(false);
+      } else {
+        const errMsg = data.error || "Search service temporarily unavailable. Please try again in a moment.";
+        setError(errMsg);
+        loadCachedFallback();
       }
     } catch {
-      setError("Network error — check connection");
+      setError("Search service temporarily unavailable. Please try again in a moment.");
+      loadCachedFallback();
     } finally {
       setLoading(false);
     }
-  }, [city, state, mode, limit, country, selectedSources]);
+  }, [city, state, mode, limit, country, selectedSources, loadCachedFallback]);
 
   // Handle Autocomplete Input
   const handleSearchInput = () => {
@@ -545,15 +588,15 @@ export default function Dashboard() {
       <Navbar />
 
       {/* STATS BAR */}
-      <div className="border-b border-gray-100 px-4 md:px-8 py-3 flex items-center gap-4 md:gap-8 text-xs md:text-sm text-gray-500 bg-gray-50 flex-wrap">
+      <div className="border-b border-gray-100 px-8 py-3 flex items-center gap-8 text-sm text-gray-500 bg-gray-50 flex-wrap">
         <span>Total Runs: <strong className="text-black">{stats?.total_runs ?? "—"}</strong></span>
         <span>Total Leads: <strong className="text-black">{stats?.total_leads ?? "—"}</strong></span>
         <span>Last Run: <strong className="text-black">{stats?.last_run ? new Date(stats.last_run).toLocaleString() : "—"}</strong></span>
-        {result && <span style={{ color: "#16A34A" }} className="font-semibold">✓ {total} results in {result.duration_ms}ms</span>}
+        {result && <span style={{ color: "#16A34A" }} className="font-semibold">✓ {total} results {result.duration_ms ? `in ${result.duration_ms}ms` : ''}</span>}
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-12">
-        <h1 className="font-black text-2xl sm:text-3xl md:text-4xl mb-2">Level 5 Intelligence Search</h1>
+      <div className="max-w-5xl mx-auto px-8 py-12">
+        <h1 className="font-black text-4xl mb-2">Level 5 Intelligence Search</h1>
         <p className="text-gray-500 mb-8">
           Any industry. Any city. Every source.{" "}
           <span className="font-semibold text-black">Google Maps · BBB · Apollo · Firecrawl · BrowserWorker · AI</span>
@@ -561,9 +604,9 @@ export default function Dashboard() {
 
         {/* ── ROW 1: Search Bar with Autocomplete & AI Assist ── */}
         <div className="mb-4">
-          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <div className="flex gap-3 flex-wrap">
             {/* Direct DOM Access Search Input + Autocomplete Dropdown Container */}
-            <div ref={searchContainerRef} className="relative flex-1 w-full sm:w-auto" style={{ minWidth: 240 }}>
+            <div ref={searchContainerRef} className="relative flex-1" style={{ minWidth: 260 }}>
               <input
                 ref={searchInputRef}
                 id="search-query-input"
@@ -603,7 +646,7 @@ export default function Dashboard() {
               type="button"
               onClick={handleAiEnhance}
               disabled={isEnhancing}
-              className={`w-full sm:w-auto justify-center rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center gap-2 border-2 ${
+              className={`rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center gap-2 border-2 ${
                 isEnhancing
                   ? "bg-purple-100 text-purple-700 border-purple-300 cursor-wait animate-pulse"
                   : "bg-purple-50 text-purple-900 border-purple-200 hover:border-purple-400 hover:bg-purple-100 shadow-sm"
@@ -626,15 +669,15 @@ export default function Dashboard() {
               value={city}
               onChange={e => setCity(e.target.value)}
               placeholder="City"
-              className="w-full sm:w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
+              className="w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
             />
 
             {/* Country toggle — distinct colors per country */}
-            <div className="w-full sm:w-auto flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setCountry("US")}
-                className="flex-1 sm:w-40 flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm py-3"
-                style={{
+                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+                style={{ width: 160, padding: "12px 0", flexShrink: 0,
                   ...(country === "US"
                     ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
                     : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
@@ -645,8 +688,8 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => setCountry("CA")}
-                className="flex-1 sm:w-40 flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm py-3"
-                style={{
+                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+                style={{ width: 160, padding: "12px 0", flexShrink: 0,
                   ...(country === "CA"
                     ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
                     : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
@@ -662,7 +705,7 @@ export default function Dashboard() {
               <select
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-full sm:w-24 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+                className="w-24 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
               >
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -670,7 +713,7 @@ export default function Dashboard() {
               <select
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-full sm:w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+                className="w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
               >
                 {CA_PROVINCES.map(p => <option key={p.code} value={p.code}>{p.code} - {p.name}</option>)}
               </select>
@@ -725,14 +768,14 @@ export default function Dashboard() {
         </div>
 
         {/* ── ROW 2: Mode + Sources Button + Limit + Search CTA ── */}
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center mb-8">
+        <div className="flex gap-3 items-center mb-8 flex-wrap">
           {/* Mode pills */}
-          <div className="flex w-full md:w-auto justify-between md:justify-start rounded-xl border-2 border-gray-200 p-1 bg-white">
+          <div className="flex rounded-xl border-2 border-gray-200 p-1 bg-white">
             {MODES.map(m => (
               <button
                 key={m.id}
                 onClick={() => setMode(m.id)}
-                className="flex-1 md:flex-initial rounded-lg px-3 md:px-4 py-2 text-xs md:text-sm font-bold transition-all flex items-center justify-center gap-1.5"
+                className="rounded-lg px-4 py-2 text-sm font-bold transition-all flex items-center gap-2"
                 style={{
                   backgroundColor: mode === m.id ? m.color : "transparent",
                   color: mode === m.id ? "#fff" : "#374151",
@@ -745,10 +788,10 @@ export default function Dashboard() {
           </div>
 
           {/* PROMINENT SOURCES BUTTON */}
-          <div className="relative w-full md:w-auto">
+          <div className="relative">
             <button
               onClick={() => setShowSources(v => !v)}
-              className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
+              className="flex items-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
               style={{
                 borderColor: selectedSources.length < ALL_SOURCES.length ? "#F59E0B" : "#E5E7EB",
                 backgroundColor: selectedSources.length < ALL_SOURCES.length ? "#FEF3C7" : "#FFBE00",
@@ -761,7 +804,7 @@ export default function Dashboard() {
 
             {/* Sources dropdown popover */}
             {showSources && (
-              <div className="absolute left-0 right-0 md:right-auto md:w-72 mt-2 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-2xl z-50">
+              <div className="absolute left-0 mt-2 w-72 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-2xl z-50">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
                   <span className="font-bold text-xs uppercase tracking-wider text-gray-500">Select Sources</span>
                   <div className="flex gap-2">
@@ -810,7 +853,7 @@ export default function Dashboard() {
           <select
             value={limit}
             onChange={e => setLimit(Number(e.target.value))}
-            className="w-full md:w-auto rounded-xl border-2 border-gray-200 px-3 py-3 text-sm font-semibold focus:outline-none focus:border-yellow-400 bg-white text-gray-700"
+            className="rounded-xl border-2 border-gray-200 px-3 py-3 text-sm font-semibold focus:outline-none focus:border-yellow-400 bg-white text-gray-700"
           >
             <option value={40}>Max 40</option>
             <option value={100}>Max 100</option>
@@ -822,17 +865,35 @@ export default function Dashboard() {
           <button
             onClick={() => doSearch()}
             disabled={loading}
-            className="w-full md:flex-1 rounded-xl font-extrabold text-base py-3 px-8 text-black transition-all shadow-md hover:brightness-95 disabled:opacity-50"
+            className="flex-1 rounded-xl font-extrabold text-base py-3 px-8 text-black transition-all shadow-md hover:brightness-95 disabled:opacity-50"
             style={{ backgroundColor: "#FFBE00", minWidth: 160 }}
           >
             {loading ? "SEARCHING..." : "SEARCH NOW →"}
           </button>
         </div>
 
-        {/* ERROR */}
+        {/* ── USER-FRIENDLY ERROR BANNER WITH TRY AGAIN BUTTON ── */}
         {error && (
-          <div className="mb-8 p-4 rounded-2xl bg-red-50 border-2 border-red-200 text-red-700 font-semibold text-sm">
-            ⚠️ {error}
+          <div className="mb-8 p-5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">⚠️</span>
+              <div>
+                <h4 className="font-extrabold text-base text-amber-950">Search Notice</h4>
+                <p className="text-sm font-medium text-amber-900 mt-0.5">{error}</p>
+                {isCachedResults && (
+                  <p className="text-xs font-semibold text-amber-800 mt-1">
+                    📦 Showing last cached search results below from your previous session.
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => doSearch()}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl font-extrabold text-sm bg-amber-500 hover:bg-amber-600 text-black shadow transition-all flex items-center gap-2 flex-shrink-0 disabled:opacity-50"
+            >
+              <span>🔄 Try Again</span>
+            </button>
           </div>
         )}
 
@@ -851,9 +912,16 @@ export default function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <div>
-                <h2 className="font-black text-2xl">{total} Results</h2>
-                <p className="text-gray-500 text-sm">
-                  for &quot;{result.query}&quot; in {result.city}, {result.state} · {result.duration_ms}ms · {result.mode} mode
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-black text-2xl">{total} Results</h2>
+                  {isCachedResults && (
+                    <span className="bg-yellow-100 text-yellow-900 border border-yellow-300 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                      📦 Cached Results
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-500 text-sm mt-1">
+                  for &quot;{result.query}&quot; in {result.city}, {result.state} {result.duration_ms ? `· ${result.duration_ms}ms` : ''} · {result.mode} mode
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -937,77 +1005,75 @@ export default function Dashboard() {
                           )}
                         </div>
                       </div>
-                      {r.rating && (
-                        <p className="text-sm text-yellow-600 font-semibold mb-2">
-                          ★ {r.rating} {r.review_count ? `(${r.review_count} reviews)` : ""}
-                        </p>
-                      )}
-                      {r.address && <p className="text-sm text-gray-500 mb-3 leading-tight">{r.address}</p>}
-                    </div>
 
-                    <div className="pt-3 border-t border-gray-100 space-y-2">
-                      <div className="flex gap-2 flex-wrap items-center">
-                      <button
-                        onClick={() => sendToOutreach([r])}
-                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold bg-amber-400 hover:bg-amber-500 text-black transition-all shadow-xs"
-                        title="Send lead to AI Email Outreach"
-                      >
-                        ⚡ Outreach
-                      </button>
+                      <div className="space-y-1.5 text-xs text-gray-600 mb-4">
                         {r.phone && (
-                          <a
-                            href={`tel:${r.phone.replace(/\D/g,"")}`}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                          >
-                            📞 {r.phone}
-                          </a>
+                          <div className="flex items-center gap-1.5">
+                            <span>📞</span>
+                            <a href={`tel:${r.phone}`} className="hover:underline font-semibold text-gray-800">
+                              {r.phone}
+                            </a>
+                          </div>
+                        )}
+                        {r.email && (
+                          <div className="flex items-center gap-1.5">
+                            <span>✉️</span>
+                            <a href={`mailto:${r.email}`} className="hover:underline text-blue-600 font-semibold truncate max-w-[200px]">
+                              {r.email}
+                            </a>
+                          </div>
+                        )}
+                        {r.address && (
+                          <div className="flex items-center gap-1.5">
+                            <span>📍</span>
+                            <span className="truncate">{r.address}{r.city ? `, ${r.city}` : ""}{r.state ? `, ${r.state}` : ""}</span>
+                          </div>
                         )}
                         {r.website && (
-                          <a
-                            href={r.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                          >
-                            🌐 Website
-                          </a>
+                          <div className="flex items-center gap-1.5">
+                            <span>🌐</span>
+                            <a
+                              href={r.website.startsWith("http") ? r.website : `https://${r.website}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline font-medium truncate max-w-[200px]"
+                            >
+                              {r.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                            </a>
+                          </div>
                         )}
-                        {r.email ? (
-                          <a
-                            href={`mailto:${r.email}`}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                          >
-                            ✉ Email
-                          </a>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-normal text-gray-400 bg-gray-50 border border-gray-100">
-                            ✉ No email listed
-                          </span>
-                        )}
-                        {r.source && (
-                          <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold bg-gray-50 text-gray-500">
-                            {r.source}
-                          </span>
+                        {r.rating && (
+                          <div className="flex items-center gap-1 text-amber-500 font-bold">
+                            <span>⭐</span>
+                            <span>{r.rating}</span>
+                            {r.review_count && <span className="text-gray-400 font-normal">({r.review_count} reviews)</span>}
+                          </div>
                         )}
                       </div>
+                    </div>
 
-                      {/* Save Lead button */}
-                      <div className="pt-1 flex justify-end">
-                        {isSaved ? (
-                          <button
-                            disabled
-                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold bg-green-50 text-green-700 border border-green-200 cursor-default"
-                          >
-                            🔖 Saved ✓
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleSaveLead(r)}
-                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold border border-yellow-400 bg-yellow-50 text-black hover:bg-yellow-400 transition-all cursor-pointer shadow-sm"
-                          >
-                            🔖 Save Lead
-                          </button>
-                        )}
+                    <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-gray-400 bg-gray-50 px-2 py-1 rounded-md uppercase tracking-wider">
+                        {r.source || "Google Maps"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSaveLead(r)}
+                          disabled={isSaved}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
+                            isSaved
+                              ? "bg-green-50 text-green-700 border-green-200 cursor-default"
+                              : "bg-white hover:bg-yellow-50 text-gray-700 border-gray-200 hover:border-yellow-400"
+                          }`}
+                        >
+                          {isSaved ? "Saved ✓" : "💾 Save"}
+                        </button>
+                        <button
+                          onClick={() => sendToOutreach([r])}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-black text-white hover:bg-gray-800 transition-all"
+                        >
+                          Outreach →
+                        </button>
                       </div>
                     </div>
                   </div>

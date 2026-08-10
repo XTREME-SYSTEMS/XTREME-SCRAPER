@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
-import { CRMContact } from "@/lib/crm";
+import { CRMContact, getStoredCRMContacts, saveStoredCRMContacts } from "@/lib/crm";
 
 interface SavedLead {
   id: string;
@@ -81,15 +81,23 @@ export default function SavedPage() {
   const handleAddToCRM = (e: React.MouseEvent, lead: SavedLead) => {
     e.stopPropagation();
     try {
-      const raw = localStorage.getItem("xts_crm_contacts");
-      const existing: CRMContact[] = raw ? JSON.parse(raw) : [];
+      const existing: CRMContact[] = getStoredCRMContacts();
 
-      const alreadyExists = existing.some(
-        (c) => c.id === lead.id || (c.name.toLowerCase() === lead.name.toLowerCase() && c.phone === lead.phone)
-      );
+      const leadNameNorm = (lead.name || "").trim().toLowerCase();
+      const leadPhoneNorm = (lead.phone || "").trim().toLowerCase();
+
+      const alreadyExists = existing.some((c) => {
+        const cNameNorm = (c.name || "").trim().toLowerCase();
+        const cPhoneNorm = (c.phone || "").trim().toLowerCase();
+
+        const nameMatches = Boolean(leadNameNorm && cNameNorm && leadNameNorm === cNameNorm);
+        const phoneMatches = Boolean(leadPhoneNorm && cPhoneNorm && leadPhoneNorm === cPhoneNorm);
+
+        return nameMatches || phoneMatches;
+      });
 
       if (alreadyExists) {
-        triggerToast(`"${lead.name}" is already in CRM`);
+        triggerToast("Already in CRM");
         return;
       }
 
@@ -116,9 +124,8 @@ export default function SavedPage() {
         updatedAt: new Date().toISOString()
       };
 
-      const updated = [newContact, ...existing];
-      localStorage.setItem("xts_crm_contacts", JSON.stringify(updated));
-      triggerToast("Added to CRM");
+      saveStoredCRMContacts([newContact, ...existing]);
+      triggerToast("Added to CRM!");
     } catch (err) {
       console.error("Failed to add to CRM", err);
     }
@@ -127,8 +134,8 @@ export default function SavedPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#fff", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar />
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "40px 24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div className="px-4 sm:px-6 py-6 sm:py-10" style={{ maxWidth: 960, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111", margin: 0 }}>Saved Leads</h1>
             <p style={{ color: "#666", marginTop: 4, fontSize: 14 }}>{leads.length} lead{leads.length !== 1 ? "s" : ""} saved</p>
@@ -155,7 +162,7 @@ export default function SavedPage() {
               placeholder="Filter leads..."
               defaultValue=""
               onChange={() => setFilter(filterRef.current?.value || "")}
-              style={{ padding: "9px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, outline: "none", minWidth: 200 }}
+              style={{ padding: "9px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, outline: "none", flex: "1 1 180px", maxWidth: "100%", boxSizing: "border-box" }}
             />
             <button onClick={selectAll} style={{ padding: "9px 14px", border: "1px solid #FFBE00", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#FFBE00", fontWeight: 600, color: "#111" }}>Select All</button>
             <button onClick={clearAll} style={{ padding: "9px 14px", border: "1px solid #999", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#f0f0f0", fontWeight: 600, color: "#333" }}>Clear</button>
@@ -179,15 +186,25 @@ export default function SavedPage() {
         {filtered.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {filtered.map((lead) => (
-              <div key={lead.id} onClick={() => toggleSelect(lead.id)} style={{ border: `1px solid ${selected.has(lead.id) ? "#111" : "#e5e5e5"}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", background: selected.has(lead.id) ? "#f9f9f9" : "#fff", transition: "border-color 0.15s", display: "flex", gap: 16, alignItems: "flex-start" }}>
-                <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggleSelect(lead.id)} onClick={(e) => e.stopPropagation()} style={{ marginTop: 4, width: 16, height: 16, cursor: "pointer", accentColor: "#111" }} />
-                <div style={{ flex: 1 }}>
+              <div key={lead.id} onClick={() => toggleSelect(lead.id)} style={{ border: `1px solid ${selected.has(lead.id) ? "#111" : "#e5e5e5"}`, borderRadius: 10, padding: "16px", cursor: "pointer", background: selected.has(lead.id) ? "#f9f9f9" : "#fff", transition: "border-color 0.15s", display: "flex", gap: 12, alignItems: "flex-start", overflow: "hidden", maxWidth: "100%", boxSizing: "border-box" }}>
+                <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggleSelect(lead.id)} onClick={(e) => e.stopPropagation()} style={{ marginTop: 4, width: 16, height: 16, cursor: "pointer", accentColor: "#111", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: "#111" }}>{lead.name}</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: "#111", overflowWrap: "anywhere", wordBreak: "break-word" }}>{lead.name}</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                       <button
                         onClick={(e) => handleAddToCRM(e, lead)}
-                        className="px-3 py-1 text-xs font-bold rounded-lg border border-black bg-yellow-400 text-black hover:bg-yellow-300 transition-all shadow-sm"
+                        style={{
+                          backgroundColor: "#FFBE00",
+                          color: "#000",
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: "pointer"
+                        }}
+                        className="hover:brightness-95 transition-all shadow-xs"
                         title="Add this lead directly to your CRM"
                       >
                         + Add to CRM
@@ -196,11 +213,11 @@ export default function SavedPage() {
                       {lead.stars && <span style={{ fontSize: 13, color: "#f59e0b" }}>{"★".repeat(Math.round(lead.stars))}</span>}
                     </div>
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 14, color: "#555", display: "flex", flexWrap: "wrap", gap: 16 }}>
+                  <div style={{ marginTop: 6, fontSize: 14, color: "#555", display: "flex", flexWrap: "wrap", gap: 12, overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {lead.phone && <span>📞 {lead.phone}</span>}
                     {lead.address && <span>📍 {lead.address}</span>}
                     {lead.email ? (
-                      <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} style={{ color: "#2563eb", textDecoration: "none" }}>✉ {lead.email}</a>
+                      <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} style={{ color: "#2563eb", textDecoration: "none", wordBreak: "break-all" }}>✉ {lead.email}</a>
                     ) : (
                       <span style={{ color: "#bbb" }}>No email listed</span>
                     )}

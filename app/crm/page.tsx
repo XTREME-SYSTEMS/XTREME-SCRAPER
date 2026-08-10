@@ -1,4 +1,5 @@
 "use client";
+import FollowUpQueue, { scheduleFollowUps } from "@/app/components/FollowUpQueue";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -182,7 +183,13 @@ export default function CRMDashboard() {
     if (selectedContact && selectedContact.id === contactId) {
       setSelectedContact((prev) => prev ? { ...prev, status: newStatus } : null);
     }
-    triggerToast(`Moved "${targetContact.name}" to ${newStatus}`);
+    // Auto-schedule Day 3/7/14 follow-ups when moved to Contacted
+    if (newStatus === "Contacted") {
+      scheduleFollowUps(contactId, targetContact.name, targetContact.phone);
+      triggerToast(`Moved to Contacted — follow-ups scheduled (Day 3, 7, 14)`);
+    } else {
+      triggerToast(`Moved "${targetContact.name}" to ${newStatus}`);
+    }
   };
 
   // AI Analysis across all contacts
@@ -297,6 +304,24 @@ export default function CRMDashboard() {
     return "border-red-400 text-red-500 bg-red-50";
   };
 
+
+  const handleExportCSV = () => {
+    const headers = ["Name","Phone","Email","Address","Status","AI Score","AI Insight","Deal Value","Tags","Last Contact","Notes"];
+    const rows = contacts.map(c => [
+      c.name||"", c.phone||"", c.email||"", c.address||"", c.status||"",
+      c.aiScore||"", (c.aiInsight||"").replace(/,/g," "), c.dealValue||"",
+      (c.tags||[]).join("|"), c.lastContact||"", (c.notes||"").replace(/,/g," ")
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `xts-crm-export-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    triggerToast("CSV exported!");
+  };
   return (
     <div className="min-h-screen bg-white text-black font-sans flex flex-col">
       <Navbar />

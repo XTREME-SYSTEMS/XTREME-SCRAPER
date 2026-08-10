@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+const PROTECTED_ROUTES = ["/saved", "/archive", "/crm", "/outreach", "/company-intel", "/analytics"];
+
 export function proxy(request: NextRequest) {
-  const userCookie = request.cookies.get("xts_user");
   const pathname = request.nextUrl.pathname;
 
-  const protectedRoutes = ["/saved", "/archive", "/outreach", "/company-intel"];
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isProtected = PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
+  if (!isProtected) return NextResponse.next();
 
-  if (isProtectedRoute && !userCookie?.value) {
+  const sessionCookie = request.cookies.get("xts_session");
+  const userCookie = request.cookies.get("xts_user");
+
+  if (!sessionCookie?.value && !userCookie?.value) {
     const authUrl = new URL("/auth", request.url);
     authUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(authUrl);
@@ -18,7 +20,3 @@ export function proxy(request: NextRequest) {
 
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ["/saved/:path*", "/archive/:path*", "/outreach/:path*", "/company-intel/:path*"],
-};
