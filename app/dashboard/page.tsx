@@ -234,26 +234,35 @@ export default function Dashboard() {
             className="w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
           />
 
-          {/* Country toggle + State/Province */}
-          <div className="flex rounded-xl border-2 border-gray-200 overflow-hidden">
+          {/* Country toggle — distinct colors per country */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setCountry("US")}
-              className="px-4 py-2 text-sm font-bold border-r border-gray-200"
-              style={{ background: country === "US" ? "#FFBE00" : "#fff", color: "#111" }}
+              className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black border-2 transition-all"
+              style={country === "US"
+                ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
+                : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" }
+              }
             >
-              🇺🇸 US
+              <span style={{ fontSize: 20, lineHeight: 1 }}>🇺🇸</span>
+              <span>United States</span>
             </button>
             <button
               onClick={() => setCountry("CA")}
-              className="px-4 py-2 text-sm font-bold border-r border-gray-200"
-              style={{ background: country === "CA" ? "#FFBE00" : "#fff", color: "#111" }}
+              className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black border-2 transition-all"
+              style={country === "CA"
+                ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
+                : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" }
+              }
             >
-              🇨🇦 CA
+              <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
+              <span>Canada</span>
             </button>
             <select
               value={state}
               onChange={e => setState(e.target.value)}
-              className="w-24 px-3 py-3 text-base focus:outline-none bg-white"
+              className="rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white font-semibold"
+              style={{ minWidth: 140 }}
             >
               {country === "US"
                 ? US_STATES.map(s => <option key={s} value={s}>{s}</option>)
@@ -296,14 +305,19 @@ export default function Dashboard() {
         <div className="mb-5">
           <button
             onClick={() => setShowSources(v => !v)}
-            className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-black transition-colors"
+            className="flex items-center gap-2 rounded-xl border-2 px-5 py-3 text-sm font-bold transition-all"
+            style={showSources
+              ? { background: "#111", borderColor: "#111", color: "#FFBE00" }
+              : { background: "#FFBE00", borderColor: "#FFBE00", color: "#111" }
+            }
           >
-            <span
-              className="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold border-2"
-              style={{ borderColor: "#FFBE00", color: "#FFBE00" }}
-            >✓</span>
-            Sources ({selectedSources.length}/{ALL_SOURCES.length} active)
-            <span className="text-gray-300 font-normal">{showSources ? "▲" : "▼"}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+            {selectedSources.length === ALL_SOURCES.length
+              ? "All Sources Active"
+              : `${selectedSources.length} of ${ALL_SOURCES.length} Sources`}
+            <span className="font-black text-base leading-none" style={{ marginLeft: 4 }}>{showSources ? "▲" : "▼"}</span>
           </button>
 
           {showSources && (
