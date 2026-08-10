@@ -1,7 +1,7 @@
 {
   "name": "xtreme-scraper",
   "version": "2.0.0",
-  "description": "Xtreme Scraper — Level 5 intelligence search. US + Canada.",
+  "description": "Xtreme Scraper \u2014 Level 5 intelligence search. US + Canada.",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "15.3.4",
+    "next": "15.4.2",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
