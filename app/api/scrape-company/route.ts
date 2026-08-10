@@ -1,5 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+async function fetchWithTimeoutAndRetry(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 15000,
+  maxAttempts = 2
+): Promise<Response> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) return res;
+    } catch {
+      clearTimeout(timer);
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error(`Failed to fetch ${url} after ${maxAttempts} attempts`);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -12,10 +38,12 @@ export async function POST(req: NextRequest) {
     
     let html = '';
     try {
-      const res = await fetch(cleanUrl, { 
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
-        signal: AbortSignal.timeout(10000)
-      });
+      const res = await fetchWithTimeoutAndRetry(
+        cleanUrl,
+        { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' } },
+        15000,
+        2
+      );
       html = await res.text();
     } catch {
       // Return graceful mock fallback or URL domain analysis if external site fetch times out / fails
@@ -81,22 +109,27 @@ export async function POST(req: NextRequest) {
     // Use OpenAI to analyze if available
     if (process.env.OPENAI_API_KEY) {
       try {
-        const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{
-              role: 'system',
-              content: 'Extract company intelligence from website text. Return JSON: {companyName, tagline, services[], highlights[], targetAudience, tone, highlight}'
-            }, {
-              role: 'user',
-              content: `Company: ${companyName}\nDescription: ${description}\n\nWebsite text:\n${text}`
-            }],
-            max_tokens: 400,
-            response_format: { type: 'json_object' }
-          })
-        });
+        const aiRes = await fetchWithTimeoutAndRetry(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{
+                role: 'system',
+                content: 'Extract company intelligence from website text. Return JSON: {companyName, tagline, services[], highlights[], targetAudience, tone, highlight}'
+              }, {
+                role: 'user',
+                content: `Company: ${companyName}\nDescription: ${description}\n\nWebsite text:\n${text}`
+              }],
+              max_tokens: 400,
+              response_format: { type: 'json_object' }
+            })
+          },
+          15000,
+          2
+        );
         const aiData = await aiRes.json();
         const extracted = JSON.parse(aiData.choices?.[0]?.message?.content || '{}');
         intel = { ...intel, ...extracted, url: cleanUrl };

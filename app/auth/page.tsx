@@ -43,7 +43,8 @@ function AuthForm() {
       localStorage.setItem("xts_accounts", JSON.stringify(accounts));
       const user = { email, name, plan: "free" };
       localStorage.setItem("xts_user", JSON.stringify(user));
-      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800`;
+      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `xts_session=1; path=/; max-age=604800; SameSite=Lax`;
       setSuccess("Account created! Redirecting...");
       setTimeout(() => router.push(redirectTarget), 800);
     } else {
@@ -57,7 +58,8 @@ function AuthForm() {
       }
       const user = { email: match.email, name: match.name, plan: "free" };
       localStorage.setItem("xts_user", JSON.stringify(user));
-      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800`;
+      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `xts_session=1; path=/; max-age=604800; SameSite=Lax`;
       router.push(redirectTarget);
     }
   };

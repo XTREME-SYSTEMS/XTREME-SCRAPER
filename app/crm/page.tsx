@@ -325,7 +325,7 @@ export default function CRMDashboard() {
             </button>
 
             <button
-              onClick={() => exportContactsToCSV(filteredContacts)}
+              onClick={() => exportContactsToCSV(contacts)}
               className="px-4 py-2.5 rounded-xl font-bold text-sm border border-gray-400 text-gray-800 bg-gray-100 hover:bg-gray-200 transition-all shadow-sm"
             >
               Export CSV

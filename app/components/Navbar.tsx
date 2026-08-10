@@ -23,6 +23,7 @@ export default function Navbar() {
     localStorage.removeItem("xts_auth_user");
     localStorage.removeItem("xts_user");
     document.cookie = "xts_user=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "xts_session=; path=/; max-age=0; SameSite=Lax";
     window.location.href = "/auth";
   };
 

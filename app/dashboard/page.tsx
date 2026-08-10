@@ -369,7 +369,28 @@ export default function Dashboard() {
       }
       const data: SearchResponse = await res.json();
       setResult(data);
-      if (!data.ok) setError(data.error ?? "Search failed");
+      if (!data.ok) {
+        setError(data.error ?? "Search failed");
+      } else {
+        try {
+          const resultsCount = (data.results || data.leads || []).length || data.total_results || data.leads_found || 0;
+          const searchLogItem = {
+            query: Q,
+            city: C,
+            state: ST,
+            country: CT,
+            mode: MD,
+            resultsCount,
+            timestamp: new Date().toISOString()
+          };
+          const rawLog = localStorage.getItem("xts_search_log");
+          const searchLogs = rawLog ? JSON.parse(rawLog) : [];
+          searchLogs.push(searchLogItem);
+          localStorage.setItem("xts_search_log", JSON.stringify(searchLogs));
+        } catch (e) {
+          console.error("Failed to append to xts_search_log:", e);
+        }
+      }
     } catch {
       setError("Network error — check connection");
     } finally {
@@ -524,15 +545,15 @@ export default function Dashboard() {
       <Navbar />
 
       {/* STATS BAR */}
-      <div className="border-b border-gray-100 px-8 py-3 flex items-center gap-8 text-sm text-gray-500 bg-gray-50 flex-wrap">
+      <div className="border-b border-gray-100 px-4 md:px-8 py-3 flex items-center gap-4 md:gap-8 text-xs md:text-sm text-gray-500 bg-gray-50 flex-wrap">
         <span>Total Runs: <strong className="text-black">{stats?.total_runs ?? "—"}</strong></span>
         <span>Total Leads: <strong className="text-black">{stats?.total_leads ?? "—"}</strong></span>
         <span>Last Run: <strong className="text-black">{stats?.last_run ? new Date(stats.last_run).toLocaleString() : "—"}</strong></span>
         {result && <span style={{ color: "#16A34A" }} className="font-semibold">✓ {total} results in {result.duration_ms}ms</span>}
       </div>
 
-      <div className="max-w-5xl mx-auto px-8 py-12">
-        <h1 className="font-black text-4xl mb-2">Level 5 Intelligence Search</h1>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-12">
+        <h1 className="font-black text-2xl sm:text-3xl md:text-4xl mb-2">Level 5 Intelligence Search</h1>
         <p className="text-gray-500 mb-8">
           Any industry. Any city. Every source.{" "}
           <span className="font-semibold text-black">Google Maps · BBB · Apollo · Firecrawl · BrowserWorker · AI</span>
@@ -540,9 +561,9 @@ export default function Dashboard() {
 
         {/* ── ROW 1: Search Bar with Autocomplete & AI Assist ── */}
         <div className="mb-4">
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
             {/* Direct DOM Access Search Input + Autocomplete Dropdown Container */}
-            <div ref={searchContainerRef} className="relative flex-1" style={{ minWidth: 260 }}>
+            <div ref={searchContainerRef} className="relative flex-1 w-full sm:w-auto" style={{ minWidth: 240 }}>
               <input
                 ref={searchInputRef}
                 id="search-query-input"
@@ -582,7 +603,7 @@ export default function Dashboard() {
               type="button"
               onClick={handleAiEnhance}
               disabled={isEnhancing}
-              className={`rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center gap-2 border-2 ${
+              className={`w-full sm:w-auto justify-center rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center gap-2 border-2 ${
                 isEnhancing
                   ? "bg-purple-100 text-purple-700 border-purple-300 cursor-wait animate-pulse"
                   : "bg-purple-50 text-purple-900 border-purple-200 hover:border-purple-400 hover:bg-purple-100 shadow-sm"
@@ -605,15 +626,15 @@ export default function Dashboard() {
               value={city}
               onChange={e => setCity(e.target.value)}
               placeholder="City"
-              className="w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
+              className="w-full sm:w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
             />
 
             {/* Country toggle — distinct colors per country */}
-            <div className="flex items-center gap-2">
+            <div className="w-full sm:w-auto flex items-center gap-2">
               <button
                 onClick={() => setCountry("US")}
-                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
-                style={{ width: 160, padding: "12px 0", flexShrink: 0,
+                className="flex-1 sm:w-40 flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm py-3"
+                style={{
                   ...(country === "US"
                     ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
                     : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
@@ -624,8 +645,8 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => setCountry("CA")}
-                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
-                style={{ width: 160, padding: "12px 0", flexShrink: 0,
+                className="flex-1 sm:w-40 flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm py-3"
+                style={{
                   ...(country === "CA"
                     ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
                     : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
@@ -641,7 +662,7 @@ export default function Dashboard() {
               <select
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-24 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+                className="w-full sm:w-24 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
               >
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -649,7 +670,7 @@ export default function Dashboard() {
               <select
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+                className="w-full sm:w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
               >
                 {CA_PROVINCES.map(p => <option key={p.code} value={p.code}>{p.code} - {p.name}</option>)}
               </select>
@@ -704,14 +725,14 @@ export default function Dashboard() {
         </div>
 
         {/* ── ROW 2: Mode + Sources Button + Limit + Search CTA ── */}
-        <div className="flex gap-3 items-center mb-8 flex-wrap">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center mb-8">
           {/* Mode pills */}
-          <div className="flex rounded-xl border-2 border-gray-200 p-1 bg-white">
+          <div className="flex w-full md:w-auto justify-between md:justify-start rounded-xl border-2 border-gray-200 p-1 bg-white">
             {MODES.map(m => (
               <button
                 key={m.id}
                 onClick={() => setMode(m.id)}
-                className="rounded-lg px-4 py-2 text-sm font-bold transition-all flex items-center gap-2"
+                className="flex-1 md:flex-initial rounded-lg px-3 md:px-4 py-2 text-xs md:text-sm font-bold transition-all flex items-center justify-center gap-1.5"
                 style={{
                   backgroundColor: mode === m.id ? m.color : "transparent",
                   color: mode === m.id ? "#fff" : "#374151",
@@ -724,10 +745,10 @@ export default function Dashboard() {
           </div>
 
           {/* PROMINENT SOURCES BUTTON */}
-          <div className="relative">
+          <div className="relative w-full md:w-auto">
             <button
               onClick={() => setShowSources(v => !v)}
-              className="flex items-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
+              className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
               style={{
                 borderColor: selectedSources.length < ALL_SOURCES.length ? "#F59E0B" : "#E5E7EB",
                 backgroundColor: selectedSources.length < ALL_SOURCES.length ? "#FEF3C7" : "#FFBE00",
@@ -740,7 +761,7 @@ export default function Dashboard() {
 
             {/* Sources dropdown popover */}
             {showSources && (
-              <div className="absolute left-0 mt-2 w-72 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-2xl z-50">
+              <div className="absolute left-0 right-0 md:right-auto md:w-72 mt-2 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-2xl z-50">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
                   <span className="font-bold text-xs uppercase tracking-wider text-gray-500">Select Sources</span>
                   <div className="flex gap-2">
@@ -789,7 +810,7 @@ export default function Dashboard() {
           <select
             value={limit}
             onChange={e => setLimit(Number(e.target.value))}
-            className="rounded-xl border-2 border-gray-200 px-3 py-3 text-sm font-semibold focus:outline-none focus:border-yellow-400 bg-white text-gray-700"
+            className="w-full md:w-auto rounded-xl border-2 border-gray-200 px-3 py-3 text-sm font-semibold focus:outline-none focus:border-yellow-400 bg-white text-gray-700"
           >
             <option value={40}>Max 40</option>
             <option value={100}>Max 100</option>
@@ -801,7 +822,7 @@ export default function Dashboard() {
           <button
             onClick={() => doSearch()}
             disabled={loading}
-            className="flex-1 rounded-xl font-extrabold text-base py-3 px-8 text-black transition-all shadow-md hover:brightness-95 disabled:opacity-50"
+            className="w-full md:flex-1 rounded-xl font-extrabold text-base py-3 px-8 text-black transition-all shadow-md hover:brightness-95 disabled:opacity-50"
             style={{ backgroundColor: "#FFBE00", minWidth: 160 }}
           >
             {loading ? "SEARCHING..." : "SEARCH NOW →"}

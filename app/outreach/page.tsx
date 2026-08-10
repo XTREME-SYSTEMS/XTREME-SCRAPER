@@ -73,6 +73,27 @@ export default function OutreachPage() {
       return;
     }
 
+    // Detect template name or default
+    let templateName = "Custom Draft";
+    if (subject.toLowerCase().includes("question about")) templateName = "Cold Intro Pitch";
+    else if (subject.toLowerCase().includes("partnership")) templateName = "Partnership Proposal";
+    else if (subject.toLowerCase().includes("offer")) templateName = "Follow-Up Offer";
+
+    try {
+      const existingSent = JSON.parse(localStorage.getItem("xts_outreach_sent") || "[]");
+      const newSent = recipients.map(r => ({
+        id: `sent_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        recipientName: r.name,
+        recipientEmail: r.email || r.phone || "N/A",
+        subject,
+        templateName,
+        sentAt: new Date().toISOString()
+      }));
+      localStorage.setItem("xts_outreach_sent", JSON.stringify([...existingSent, ...newSent]));
+    } catch (e) {
+      console.error("Error logging sent emails:", e);
+    }
+
     // Simulate sending campaign
     setSentCount(recipients.length);
     setTimeout(() => {
