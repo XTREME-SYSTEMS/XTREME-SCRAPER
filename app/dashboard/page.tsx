@@ -1,6 +1,8 @@
 "use client";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import Navbar from "@/app/components/Navbar";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MODES = [
@@ -42,7 +44,6 @@ const CA_PROVINCES = [
 ];
 
 const INDUSTRY_KEYWORDS: string[] = [
-  // FLOORING
   'epoxy floor contractors', 'polished concrete contractors', 'hardwood floor installers',
   'tile flooring companies', 'LVP flooring installers', 'vinyl plank flooring contractors',
   'commercial flooring subcontractors', 'warehouse floor coating companies',
@@ -50,85 +51,45 @@ const INDUSTRY_KEYWORDS: string[] = [
   'floor coating applicators', 'decorative concrete contractors',
   'resinous flooring companies', 'urethane cement flooring',
   'polyaspartic floor coating contractors', 'self-leveling floor contractors',
-
-  // PAINTING
   'commercial painting contractors', 'interior painting companies',
   'exterior painting contractors', 'industrial painting companies',
   'commercial paint contractors', 'epoxy paint applicators',
-
-  // ROOFING
   'commercial roofing contractors', 'flat roof contractors',
   'metal roofing companies', 'TPO roofing contractors',
   'residential roofing companies', 'roofing subcontractors',
-
-  // CONCRETE / MASONRY
   'concrete contractors', 'concrete repair companies',
   'masonry contractors', 'concrete cutting companies',
   'shotcrete contractors', 'concrete polishing companies',
-
-  // GENERAL CONTRACTING
   'general contractors', 'commercial general contractors',
   'construction management companies', 'renovation contractors',
   'remodeling contractors', 'tenant improvement contractors',
-
-  // PLUMBING
   'commercial plumbing contractors', 'plumbing companies',
   'industrial plumbing contractors',
-
-  // HVAC
   'HVAC contractors', 'commercial HVAC companies',
   'mechanical contractors', 'refrigeration contractors',
-
-  // ELECTRICAL
   'electrical contractors', 'commercial electricians',
   'industrial electrical companies',
-
-  // LANDSCAPING
   'landscaping companies', 'commercial landscaping contractors',
   'lawn care companies', 'irrigation contractors',
-
-  // CLEANING
   'commercial janitorial services', 'office cleaning companies',
   'industrial cleaning contractors', 'pressure washing companies',
   'building cleaning services',
-
-  // PHOTOGRAPHY
   'commercial photographers', 'real estate photographers',
   'wedding photographers', 'product photographers',
-
-  // ACCOUNTING
   'accounting firms', 'bookkeeping companies', 'CPA firms',
   'tax preparation services', 'payroll companies',
-
-  // INSURANCE
   'insurance agencies', 'commercial insurance brokers',
   'business insurance companies',
-
-  // LAW
   'law firms', 'business attorneys', 'construction lawyers',
-
-  // MEDICAL / DENTAL
   'dental offices', 'dental practices', 'dentists',
   'chiropractic offices', 'physical therapy clinics',
-
-  // FITNESS
   'gyms', 'fitness studios', 'personal training studios',
   'crossfit gyms', 'yoga studios',
-
-  // AUTO
   'auto repair shops', 'auto body shops', 'car dealerships',
   'towing companies', 'tire shops',
-
-  // MOVING
   'moving companies', 'commercial movers', 'storage companies',
-
-  // STAFFING
   'staffing agencies', 'temp agencies', 'employment agencies',
-
-  // PEST CONTROL
   'pest control companies', 'exterminating companies',
-
-  // SECURITY
   'security companies', 'alarm system installers',
   'commercial security contractors'
 ];
@@ -229,6 +190,7 @@ type Result = {
   years_active?: number | string;
   established_year?: number;
   founded?: number;
+  savedAt?: string;
 };
 
 type SearchResponse = {
@@ -271,7 +233,7 @@ export default function Dashboard() {
   const [mode,    setMode]    = useState("deep");
   const [limit,   setLimit]   = useState(200);
 
-  // Uncontrolled Search Bar DOM access
+  // Direct DOM access for search input
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -289,6 +251,9 @@ export default function Dashboard() {
   const [showSources,     setShowSources]     = useState(false);
   const [selectedSources, setSelectedSources] = useState<string[]>(ALL_SOURCES.map(s => s.id));
 
+  // Saved leads state
+  const [savedLeadKeys, setSavedLeadKeys] = useState<Set<string>>(new Set());
+
   // Results & Stats
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState<SearchResponse | null>(null);
@@ -297,6 +262,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetch("/api/stats").then(r => r.json()).then(setStats).catch(() => {});
+
+    // Sync saved leads
+    try {
+      const stored = localStorage.getItem("xts_saved_leads");
+      if (stored) {
+        const list: Result[] = JSON.parse(stored);
+        const keys = new Set(
+          list.map((r) => `${r.company_name}|${r.phone || ""}|${r.website || ""}`)
+        );
+        setSavedLeadKeys(keys);
+      }
+    } catch {
+      setSavedLeadKeys(new Set());
+    }
   }, []);
 
   // Reset state when country changes
@@ -321,6 +300,35 @@ export default function Dashboard() {
         ? prev.length > 1 ? prev.filter(s => s !== id) : prev
         : [...prev, id]
     );
+  };
+
+  const getLeadKey = (r: Result) => `${r.company_name}|${r.phone || ""}|${r.website || ""}`;
+
+  const handleSaveLead = (r: Result) => {
+    try {
+      const key = getLeadKey(r);
+      let savedList: Result[] = [];
+      const stored = localStorage.getItem("xts_saved_leads");
+      if (stored) savedList = JSON.parse(stored);
+
+      const exists = savedList.some((item) => getLeadKey(item) === key);
+      if (!exists) {
+        const nowIso = new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        savedList.push({
+          ...r,
+          savedAt: nowIso,
+        });
+        localStorage.setItem("xts_saved_leads", JSON.stringify(savedList));
+      }
+
+      setSavedLeadKeys((prev) => new Set([...prev, key]));
+    } catch (e) {
+      console.error("Error saving lead:", e);
+    }
   };
 
   const doSearch = useCallback(async (
@@ -461,6 +469,23 @@ export default function Dashboard() {
     URL.revokeObjectURL(url);
   };
 
+  // Send to AI Outreach Engine
+  const sendToOutreach = (leadsToSend: Result[]) => {
+    try {
+      const formatted = leadsToSend.map(r => ({
+        company_name: (r.company_name || '').replace(/<[^>]+>/g, ''),
+        name: (r.company_name || '').replace(/<[^>]+>/g, ''),
+        email: r.email || '',
+        phone: r.phone || '',
+        source: r.source || 'Scraped Lead',
+        industry: searchInputRef.current?.value || 'Services',
+        address: r.address || '',
+      }));
+      localStorage.setItem('xts_outreach_queue', JSON.stringify(formatted));
+      window.location.href = '/outreach';
+    } catch {}
+  };
+
   // Highlight text match in autocomplete dropdown
   const renderHighlighted = (text: string) => {
     const query = searchInputRef.current?.value || "";
@@ -496,10 +521,7 @@ export default function Dashboard() {
       )}
 
       {/* NAV */}
-      <nav className="border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 bg-white z-50">
-        <span className="font-black text-xl">XTREME SCRAPER</span>
-        <Link href="/" className="text-sm font-semibold" style={{ color: "#FFBE00" }}>← Home</Link>
-      </nav>
+      <Navbar />
 
       {/* STATS BAR */}
       <div className="border-b border-gray-100 px-8 py-3 flex items-center gap-8 text-sm text-gray-500 bg-gray-50 flex-wrap">
@@ -516,242 +538,142 @@ export default function Dashboard() {
           <span className="font-semibold text-black">Google Maps · BBB · Apollo · Firecrawl · BrowserWorker · AI</span>
         </p>
 
-        {/* ── ROW 1: Query (with AI Assist & Autocomplete) + City + Country + State ── */}
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div ref={searchContainerRef} className="relative flex-1" style={{ minWidth: 260 }}>
-            <input
-              ref={searchInputRef}
-              id="search-input"
-              type="text"
-              defaultValue=""
-              onInput={handleSearchInput}
-              onKeyDown={handleKeyDown}
-              onFocus={() => {
-                const currentVal = searchInputRef.current?.value || "";
-                if (currentVal.trim()) handleSearchInput();
-              }}
-              placeholder="Search any industry... (plumbers, photographers, accountants)"
-              className="w-full rounded-xl border-2 border-gray-200 pl-5 pr-28 py-3 text-base focus:outline-none focus:border-yellow-400"
-            />
-            {/* AI Assist Button */}
+        {/* ── ROW 1: Search Bar with Autocomplete & AI Assist ── */}
+        <div className="mb-4">
+          <div className="flex gap-3 flex-wrap">
+            {/* Direct DOM Access Search Input + Autocomplete Dropdown Container */}
+            <div ref={searchContainerRef} className="relative flex-1" style={{ minWidth: 260 }}>
+              <input
+                ref={searchInputRef}
+                id="search-query-input"
+                type="text"
+                defaultValue="Epoxy flooring"
+                onInput={handleSearchInput}
+                onFocus={handleSearchInput}
+                onKeyDown={handleKeyDown}
+                placeholder="Search any industry... (plumbers, photographers, accountants)"
+                className="w-full rounded-xl border-2 border-gray-200 px-5 py-3 text-base focus:outline-none focus:border-yellow-400 font-medium"
+              />
+
+              {/* Autocomplete Dropdown */}
+              {showAutocomplete && suggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-50 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex items-center justify-between">
+                    <span>Suggested Industries</span>
+                    <span className="text-[10px] text-gray-400 font-normal">ESC to close</span>
+                  </div>
+                  {suggestions.map((kw, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectSuggestion(kw)}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-yellow-50 hover:font-bold transition-all flex items-center gap-2 border-b border-gray-50 last:border-none"
+                    >
+                      <span className="text-gray-400 text-xs">🔍</span>
+                      <span>{renderHighlighted(kw)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* AI Enhance Button */}
             <button
               type="button"
               onClick={handleAiEnhance}
               disabled={isEnhancing}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 z-10"
+              className={`rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center gap-2 border-2 ${
+                isEnhancing
+                  ? "bg-purple-100 text-purple-700 border-purple-300 cursor-wait animate-pulse"
+                  : "bg-purple-50 text-purple-900 border-purple-200 hover:border-purple-400 hover:bg-purple-100 shadow-sm"
+              }`}
             >
               {isEnhancing ? (
                 <>
-                  <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
+                  <span className="inline-block animate-spin">✨</span>
                   <span>Enhancing...</span>
                 </>
               ) : (
                 <>
-                  <span>✨</span>
-                  <span>AI Assist</span>
+                  <span>✨ AI Assist</span>
                 </>
               )}
             </button>
 
-            {/* Smart Autocomplete Dropdown */}
-            {showAutocomplete && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden divide-y divide-gray-100">
-                {suggestions.map((item, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleSelectSuggestion(item)}
-                    className="px-4 py-2.5 text-sm cursor-pointer hover:bg-yellow-50 text-gray-800 flex items-center justify-between"
-                  >
-                    <span>{renderHighlighted(item)}</span>
-                    <span className="text-xs text-gray-400">Industry</span>
-                  </div>
-                ))}
-              </div>
+            <input
+              type="text"
+              value={city}
+              onChange={e => setCity(e.target.value)}
+              placeholder="City"
+              className="w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
+            />
+
+            {/* Country toggle — distinct colors per country */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCountry("US")}
+                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+                style={{ width: 160, padding: "12px 0", flexShrink: 0,
+                  ...(country === "US"
+                    ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
+                    : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>🇺🇸</span>
+                <span>UNITED STATES</span>
+              </button>
+              <button
+                onClick={() => setCountry("CA")}
+                className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+                style={{ width: 160, padding: "12px 0", flexShrink: 0,
+                  ...(country === "CA"
+                    ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
+                    : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
+                <span>CANADA</span>
+              </button>
+            </div>
+
+            {/* State / Province select */}
+            {country === "US" ? (
+              <select
+                value={state}
+                onChange={e => setState(e.target.value)}
+                className="w-24 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+              >
+                {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            ) : (
+              <select
+                value={state}
+                onChange={e => setState(e.target.value)}
+                className="w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
+              >
+                {CA_PROVINCES.map(p => <option key={p.code} value={p.code}>{p.code} - {p.name}</option>)}
+              </select>
             )}
           </div>
-
-          <input
-            type="text"
-            value={city}
-            onChange={e => setCity(e.target.value)}
-            placeholder="City"
-            className="w-36 rounded-xl border-2 border-gray-200 px-4 py-3 text-base focus:outline-none focus:border-yellow-400"
-          />
-
-          {/* Country toggle — distinct colors per country */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCountry("US")}
-              className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
-              style={{ width: 160, padding: "12px 0", flexShrink: 0,
-                ...(country === "US"
-                  ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
-                  : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
-              }}
-            >
-              <span style={{ fontSize: 20, lineHeight: 1 }}>🇺🇸</span>
-              <span>United States</span>
-            </button>
-            <button
-              onClick={() => setCountry("CA")}
-              className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
-              style={{ width: 160, padding: "12px 0", flexShrink: 0,
-                ...(country === "CA"
-                  ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
-                  : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
-              }}
-            >
-              <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
-              <span>Canada</span>
-            </button>
-          </div>
-
-          {/* State or Province selector */}
-          {country === "US" ? (
-            <select
-              value={state}
-              onChange={e => setState(e.target.value)}
-              className="w-28 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
-            >
-              {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          ) : (
-            <select
-              value={state}
-              onChange={e => setState(e.target.value)}
-              className="w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
-            >
-              {CA_PROVINCES.map(p => (
-                <option key={p.code} value={p.code}>{p.code} — {p.name}</option>
-              ))}
-            </select>
-          )}
         </div>
 
-        {/* ── ROW 2: Mode Selector + Limit + Source Toggle + Submit ── */}
-        <div className="flex gap-3 mb-6 flex-wrap items-center">
-          {/* Mode pills */}
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            {MODES.map(m => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  mode === m.id ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"
-                }`}
-              >
-                {m.label}
-                <span className="ml-1.5 text-xs font-normal opacity-70">{m.desc.split("·")[0]}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Limit selector */}
-          <select
-            value={limit}
-            onChange={e => setLimit(Number(e.target.value))}
-            className="rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 bg-white font-semibold"
-          >
-            <option value={50}>50 results</option>
-            <option value={100}>100 results</option>
-            <option value={200}>200 results</option>
-            <option value={500}>500 results</option>
-          </select>
-
-          {/* Sources button */}
-          <button
-            onClick={() => setShowSources(!showSources)}
-            className={`rounded-xl border-2 px-4 py-2 text-sm font-semibold transition-all ${
-              selectedSources.length < ALL_SOURCES.length
-                ? "border-yellow-400 bg-yellow-50 text-black"
-                : "border-gray-200 hover:border-gray-300 text-gray-700"
-            }`}
-          >
-            Sources ({selectedSources.length}/{ALL_SOURCES.length}) {showSources ? "▲" : "▼"}
-          </button>
-
-          {/* SEARCH BUTTON */}
-          <button
-            onClick={() => doSearch()}
-            disabled={loading}
-            style={{ backgroundColor: "#FFBE00" }}
-            className="flex-1 rounded-xl px-8 py-3 text-black font-black text-base hover:opacity-90 transition-opacity disabled:opacity-50 min-w-36 shadow-md"
-          >
-            {loading ? "SEARCHING..." : "SEARCH LEADS →"}
-          </button>
-        </div>
-
-        {/* ── SOURCE SELECTOR PANEL ── */}
-        {showSources && (
-          <div className="mb-6 p-5 rounded-2xl border-2 border-gray-100 bg-gray-50">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-sm text-gray-700">Select Data Sources</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedSources(ALL_SOURCES.map(s => s.id))}
-                  className="text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Select All
-                </button>
-                <span className="text-gray-300">|</span>
-                <button
-                  onClick={() => setSelectedSources(["google_maps"])}
-                  className="text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Google Maps Only
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {ALL_SOURCES.map(src => {
-                const active = selectedSources.includes(src.id);
-                return (
-                  <button
-                    key={src.id}
-                    onClick={() => toggleSource(src.id)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      active
-                        ? "border-yellow-400 bg-white shadow-sm"
-                        : "border-gray-200 bg-gray-100 opacity-60"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm">{src.label}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? "bg-yellow-400 text-black" : "bg-gray-200 text-gray-500"}`}>
-                        {active ? "ON" : "OFF"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{src.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── REBUILT CATEGORIZED EXAMPLES SECTION ── */}
-        <div className="mb-8 p-6 rounded-2xl bg-gray-50 border border-gray-200">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              💡 Try an Example Industry
-            </h3>
-            <span className="text-xs text-gray-400">Click any phrase to populate search bar</span>
-          </div>
+        {/* ── CATEGORIZED INDUSTRY EXAMPLES ── */}
+        <div className="mb-8 bg-gray-50 border border-gray-200/80 rounded-2xl p-4">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">
+            Explore Example Search Phrases
+          </p>
 
           {/* Category Tabs */}
-          <div className="flex flex-wrap gap-1.5 border-b border-gray-200 pb-3 mb-4">
-            {CATEGORY_TABS.map(cat => (
+          <div className="flex gap-1.5 overflow-x-auto pb-2 border-b border-gray-200 mb-3 scrollbar-none">
+            {CATEGORY_TABS.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setActiveCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold whitespace-nowrap transition-all ${
                   activeCategory === cat
                     ? "bg-black text-white shadow-sm"
-                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                    : "bg-white text-gray-600 hover:text-black border border-gray-200"
                 }`}
               >
                 {cat}
@@ -759,18 +681,18 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Chips Grid */}
+          {/* Example Chips */}
           <div className="flex flex-wrap gap-2">
-            {(CATEGORY_EXAMPLES[activeCategory] || []).map(phrase => {
+            {(CATEGORY_EXAMPLES[activeCategory] || []).map((phrase) => {
               const isSelected = selectedChip === phrase;
               return (
                 <button
                   key={phrase}
                   type="button"
                   onClick={() => handleChipClick(phrase)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                     isSelected
-                      ? "bg-yellow-400 text-black border-yellow-500 font-bold shadow-sm"
+                      ? "bg-yellow-400 text-black border-yellow-500 shadow-sm"
                       : "bg-white text-gray-700 border-gray-200 hover:border-yellow-400 hover:bg-yellow-50"
                   }`}
                 >
@@ -781,19 +703,124 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── ERROR DISPLAY ── */}
+        {/* ── ROW 2: Mode + Sources Button + Limit + Search CTA ── */}
+        <div className="flex gap-3 items-center mb-8 flex-wrap">
+          {/* Mode pills */}
+          <div className="flex rounded-xl border-2 border-gray-200 p-1 bg-white">
+            {MODES.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className="rounded-lg px-4 py-2 text-sm font-bold transition-all flex items-center gap-2"
+                style={{
+                  backgroundColor: mode === m.id ? m.color : "transparent",
+                  color: mode === m.id ? "#fff" : "#374151",
+                }}
+              >
+                <span>{m.label}</span>
+                <span className="text-xs opacity-75 font-normal">({m.desc.split("·")[0].trim()})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* PROMINENT SOURCES BUTTON */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSources(v => !v)}
+              className="flex items-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
+              style={{
+                borderColor: selectedSources.length < ALL_SOURCES.length ? "#F59E0B" : "#E5E7EB",
+                backgroundColor: selectedSources.length < ALL_SOURCES.length ? "#FEF3C7" : "#fff",
+                color: "#111827",
+              }}
+            >
+              <span>🌐 Sources ({selectedSources.length}/{ALL_SOURCES.length})</span>
+              <span className="text-xs">{showSources ? "▲" : "▼"}</span>
+            </button>
+
+            {/* Sources dropdown popover */}
+            {showSources && (
+              <div className="absolute left-0 mt-2 w-72 rounded-2xl border-2 border-gray-200 bg-white p-4 shadow-2xl z-50">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                  <span className="font-bold text-xs uppercase tracking-wider text-gray-500">Select Sources</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedSources(ALL_SOURCES.map(s => s.id))}
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      All
+                    </button>
+                    <span className="text-gray-300">·</span>
+                    <button
+                      onClick={() => setSelectedSources(["google_maps"])}
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {ALL_SOURCES.map(s => {
+                    const active = selectedSources.includes(s.id);
+                    return (
+                      <label
+                        key={s.id}
+                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-all"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => toggleSource(s.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-400"
+                        />
+                        <div>
+                          <div className="font-bold text-xs text-gray-900">{s.label}</div>
+                          <div className="text-[11px] text-gray-400">{s.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Limit selector */}
+          <select
+            value={limit}
+            onChange={e => setLimit(Number(e.target.value))}
+            className="rounded-xl border-2 border-gray-200 px-3 py-3 text-sm font-semibold focus:outline-none focus:border-yellow-400 bg-white text-gray-700"
+          >
+            <option value={40}>Max 40</option>
+            <option value={100}>Max 100</option>
+            <option value={200}>Max 200</option>
+            <option value={500}>Max 500</option>
+          </select>
+
+          {/* SEARCH BUTTON */}
+          <button
+            onClick={() => doSearch()}
+            disabled={loading}
+            className="flex-1 rounded-xl font-extrabold text-base py-3 px-8 text-black transition-all shadow-md hover:brightness-95 disabled:opacity-50"
+            style={{ backgroundColor: "#FFBE00", minWidth: 160 }}
+          >
+            {loading ? "SEARCHING..." : "SEARCH NOW →"}
+          </button>
+        </div>
+
+        {/* ERROR */}
         {error && (
-          <div className="p-4 mb-8 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+          <div className="mb-8 p-4 rounded-2xl bg-red-50 border-2 border-red-200 text-red-700 font-semibold text-sm">
             ⚠️ {error}
           </div>
         )}
 
-        {/* ── LOADING SPINNER ── */}
+        {/* LOADING INDICATOR */}
         {loading && (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-yellow-400 border-t-transparent mb-4"></div>
-            <p className="font-bold text-lg">Scraping {mode.toUpperCase()} mode...</p>
-            <p className="text-sm text-gray-500">Querying all sources in parallel</p>
+          <div className="my-16 text-center">
+            <div className="inline-block w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="font-bold text-lg text-gray-800">Scraping Level 5 sources...</p>
+            <p className="text-gray-400 text-sm mt-1">Google Maps · BBB · Apollo · Firecrawl · BrowserWorker</p>
           </div>
         )}
 
@@ -808,12 +835,20 @@ export default function Dashboard() {
                   for &quot;{result.query}&quot; in {result.city}, {result.state} · {result.duration_ms}ms · {result.mode} mode
                 </p>
               </div>
-              <button
-                onClick={exportCSV}
-                className="rounded-xl px-5 py-2 font-bold text-sm border-2 border-gray-200 hover:border-yellow-400 transition-all"
-              >
-                ⬇ Export CSV
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => sendToOutreach(hits)}
+                  className="rounded-xl px-5 py-2 font-bold text-sm bg-black text-white hover:bg-gray-800 transition-all flex items-center gap-2 shadow-sm"
+                >
+                  ✉️ Send All ({hits.length}) to AI Outreach →
+                </button>
+                <button
+                  onClick={exportCSV}
+                  className="rounded-xl px-5 py-2 font-bold text-sm border-2 border-gray-200 hover:border-yellow-400 transition-all"
+                >
+                  ⬇ Export CSV
+                </button>
+              </div>
             </div>
 
             {/* Source breakdown */}
@@ -851,74 +886,108 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {hits.map((r, i) => {
                 const yib = getYearsInBusiness(r);
+                const leadKey = getLeadKey(r);
+                const isSaved = savedLeadKeys.has(leadKey);
+
                 return (
-                  <div key={i} className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3
-                        className="font-bold text-base leading-tight flex-1 mr-2"
-                        dangerouslySetInnerHTML={{ __html: r.company_name }}
-                      />
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        {r.confidence && (
-                          <span
-                            className="text-xs font-bold rounded-full px-2 py-0.5"
-                            style={{
-                              backgroundColor: r.confidence >= 80 ? "#DCFCE7" : r.confidence >= 60 ? "#FEF9C3" : "#F3F4F6",
-                              color: r.confidence >= 80 ? "#16A34A" : r.confidence >= 60 ? "#92400E" : "#6B7280",
-                            }}
+                  <div key={i} className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between mb-3">
+                        <h3
+                          className="font-bold text-base leading-tight flex-1 mr-2"
+                          dangerouslySetInnerHTML={{ __html: r.company_name }}
+                        />
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          {r.confidence && (
+                            <span
+                              className="text-xs font-bold rounded-full px-2 py-0.5"
+                              style={{
+                                backgroundColor: r.confidence >= 80 ? "#DCFCE7" : r.confidence >= 60 ? "#FEF9C3" : "#F3F4F6",
+                                color: r.confidence >= 80 ? "#16A34A" : r.confidence >= 60 ? "#92400E" : "#6B7280",
+                              }}
+                            >
+                              {r.confidence}%
+                            </span>
+                          )}
+                          {yib && (
+                            <span className="text-xs font-semibold rounded-full px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                              {yib}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {r.rating && (
+                        <p className="text-sm text-yellow-600 font-semibold mb-2">
+                          ★ {r.rating} {r.review_count ? `(${r.review_count} reviews)` : ""}
+                        </p>
+                      )}
+                      {r.address && <p className="text-sm text-gray-500 mb-3 leading-tight">{r.address}</p>}
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-100 space-y-2">
+                      <div className="flex gap-2 flex-wrap items-center">
+                      <button
+                        onClick={() => sendToOutreach([r])}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold bg-amber-400 hover:bg-amber-500 text-black transition-all shadow-xs"
+                        title="Send lead to AI Email Outreach"
+                      >
+                        ⚡ Outreach
+                      </button>
+                        {r.phone && (
+                          <a
+                            href={`tel:${r.phone.replace(/\D/g,"")}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
                           >
-                            {r.confidence}%
+                            📞 {r.phone}
+                          </a>
+                        )}
+                        {r.website && (
+                          <a
+                            href={r.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
+                          >
+                            🌐 Website
+                          </a>
+                        )}
+                        {r.email ? (
+                          <a
+                            href={`mailto:${r.email}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
+                          >
+                            ✉ Email
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-normal text-gray-400 bg-gray-50 border border-gray-100">
+                            ✉ No email listed
                           </span>
                         )}
-                        {yib && (
-                          <span className="text-xs font-semibold rounded-full px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
-                            {yib}
+                        {r.source && (
+                          <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold bg-gray-50 text-gray-500">
+                            {r.source}
                           </span>
                         )}
                       </div>
-                    </div>
-                    {r.rating && (
-                      <p className="text-sm text-yellow-600 font-semibold mb-2">
-                        ★ {r.rating} {r.review_count ? `(${r.review_count} reviews)` : ""}
-                      </p>
-                    )}
-                    {r.address && <p className="text-sm text-gray-500 mb-3 leading-tight">{r.address}</p>}
-                    <div className="flex gap-2 flex-wrap items-center">
-                      {r.phone && (
-                        <a
-                          href={`tel:${r.phone.replace(/\D/g,"")}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                        >
-                          📞 {r.phone}
-                        </a>
-                      )}
-                      {r.website && (
-                        <a
-                          href={r.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                        >
-                          🌐 Website
-                        </a>
-                      )}
-                      {r.email ? (
-                        <a
-                          href={`mailto:${r.email}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
-                        >
-                          ✉ Email
-                        </a>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-normal text-gray-400 bg-gray-50 border border-gray-100">
-                          ✉ No email listed
-                        </span>
-                      )}
-                      {r.source && (
-                        <span className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold bg-gray-50 text-gray-500">
-                          {r.source}
-                        </span>
-                      )}
+
+                      {/* Save Lead button */}
+                      <div className="pt-1 flex justify-end">
+                        {isSaved ? (
+                          <button
+                            disabled
+                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold bg-green-50 text-green-700 border border-green-200 cursor-default"
+                          >
+                            🔖 Saved ✓
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSaveLead(r)}
+                            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold border border-yellow-400 bg-yellow-50 text-black hover:bg-yellow-400 transition-all cursor-pointer shadow-sm"
+                          >
+                            🔖 Save Lead
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

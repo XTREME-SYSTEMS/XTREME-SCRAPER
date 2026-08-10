@@ -1,221 +1,375 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
-import Link from "next/link";
 
-interface CompanyIntel {
+type CompanyIntel = {
   companyName: string;
   tagline?: string;
-  services?: string[];
+  description?: string;
   highlights?: string[];
+  services?: string[];
   targetAudience?: string;
   tone?: string;
   highlight?: string;
   url: string;
-}
+  scrapedAt?: string;
+};
 
 export default function CompanyIntelPage() {
-  const urlRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progressMsg, setProgressMsg] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<CompanyIntel | null>(null);
-  const [saved, setSaved] = useState<CompanyIntel[]>([]);
-  const [savedMsg, setSavedMsg] = useState("");
+  const [intel, setIntel] = useState<CompanyIntel | null>(null);
+  const [savedIntels, setSavedIntels] = useState<CompanyIntel[]>([]);
 
+  // Load saved profiles from localStorage on mount
   useEffect(() => {
     try {
-      const s = localStorage.getItem("xts_company_intel_list");
-      if (s) setSaved(JSON.parse(s));
+      const stored = localStorage.getItem("xts_saved_company_intels");
+      if (stored) {
+        setSavedIntels(JSON.parse(stored));
+      }
     } catch {}
   }, []);
 
-  const handleScrape = async () => {
-    const url = urlRef.current?.value?.trim();
-    if (!url) return;
-    setLoading(true);
+  const handleScrape = async (targetUrl?: string) => {
+    const inputUrl = (targetUrl || url).trim();
+    if (!inputUrl) {
+      setError("Please enter a valid website URL.");
+      return;
+    }
+
     setError("");
-    setResult(null);
+    setLoading(true);
+    setIntel(null);
+    setProgressMsg("Connecting to website server...");
+
+    const progressTimer = setTimeout(() => {
+      setProgressMsg("Extracting page HTML, text & meta tags...");
+    }, 1200);
+
+    const progressTimer2 = setTimeout(() => {
+      setProgressMsg("Analyzing company services & value proposition with AI...");
+    }, 2800);
+
     try {
       const res = await fetch("/api/scrape-company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: inputUrl }),
       });
+
+      clearTimeout(progressTimer);
+      clearTimeout(progressTimer2);
+
       const data = await res.json();
-      if (data.ok && data.intel) {
-        setResult(data.intel);
-      } else {
-        setError(data.error || "Failed to scrape. Make sure the URL is correct and publicly accessible.");
+      if (!res.ok || !data.ok || !data.intel) {
+        throw new Error(data.error || "Failed to scrape company website");
       }
-    } catch {
-      setError("Network error. Please try again.");
+
+      const scrapedIntel: CompanyIntel = {
+        ...data.intel,
+        scrapedAt: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+      };
+
+      setIntel(scrapedIntel);
+
+      // Save to history list in localStorage
+      setSavedIntels((prev) => {
+        const filtered = prev.filter(
+          (p) => p.url.toLowerCase() !== scrapedIntel.url.toLowerCase()
+        );
+        const updated = [scrapedIntel, ...filtered];
+        try {
+          localStorage.setItem("xts_saved_company_intels", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
+      clearTimeout(progressTimer);
+      clearTimeout(progressTimer2);
       setLoading(false);
+      setProgressMsg("");
     }
   };
 
-  const handleSaveIntel = () => {
-    if (!result) return;
-    const updated = [result, ...saved.filter((s) => s.url !== result.url)];
-    localStorage.setItem("xts_company_intel_list", JSON.stringify(updated));
-    setSaved(updated);
-    setSavedMsg("Profile saved!");
-    setTimeout(() => setSavedMsg(""), 2500);
+  const handleUseInOutreach = (profile: CompanyIntel) => {
+    try {
+      localStorage.setItem("xts_company_intel", JSON.stringify(profile));
+    } catch {}
+    router.push("/outreach");
   };
 
-  const handleUseInOutreach = () => {
-    if (!result) return;
-    localStorage.setItem("xts_company_intel", JSON.stringify(result));
-    window.location.href = "/outreach";
-  };
-
-  const handleDeleteSaved = (url: string) => {
-    const updated = saved.filter((s) => s.url !== url);
-    localStorage.setItem("xts_company_intel_list", JSON.stringify(updated));
-    setSaved(updated);
+  const handleDeleteSaved = (urlToDelete: string) => {
+    const updated = savedIntels.filter((item) => item.url !== urlToDelete);
+    setSavedIntels(updated);
+    try {
+      localStorage.setItem("xts_saved_company_intels", JSON.stringify(updated));
+    } catch {}
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fff", fontFamily: "Inter, system-ui, sans-serif" }}>
+    <div className="min-h-screen flex bg-white text-black font-sans">
       <Navbar />
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111", margin: 0 }}>Company Intelligence Hub</h1>
-          <p style={{ color: "#666", marginTop: 8, fontSize: 15 }}>
-            Paste any company URL. We scrape their site, extract key insights, and use that data to craft highly personalized outreach emails.
+
+      <main className="flex-1 p-8 lg:p-12 overflow-y-auto max-w-6xl mx-auto">
+        {/* HEADER */}
+        <div className="mb-8 border-b border-gray-100 pb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">🏢</span>
+            <h1 className="text-3xl font-black tracking-tight">Company Intelligence Hub</h1>
+          </div>
+          <p className="text-gray-500 font-medium text-sm">
+            Extract company mission, key services, highlights, and tone of voice from any website to power personalized AI sales outreach.
           </p>
         </div>
 
-        {/* URL input */}
-        <div style={{ background: "#f9f9f9", border: "1px solid #e5e5e5", borderRadius: 12, padding: 24, marginBottom: 32 }}>
-          <label style={{ fontWeight: 600, fontSize: 14, color: "#333", display: "block", marginBottom: 10 }}>Company Website URL</label>
-          <div style={{ display: "flex", gap: 12 }}>
+        {/* SEARCH / SCRAPE FORM */}
+        <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-6 mb-10 shadow-sm">
+          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+            Company Website URL
+          </label>
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
-              ref={urlRef}
-              type="url"
-              placeholder="https://example.com"
-              defaultValue=""
-              style={{ flex: 1, padding: "12px 16px", border: "1px solid #ddd", borderRadius: 8, fontSize: 15, outline: "none" }}
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleScrape()}
+              placeholder="e.g. https://www.acmeflooring.com or stripe.com"
+              className="flex-1 rounded-xl border-2 border-gray-300 px-4 py-3 text-base focus:outline-none focus:border-amber-400 bg-white font-medium"
             />
             <button
-              onClick={handleScrape}
+              onClick={() => handleScrape()}
               disabled={loading}
-              style={{ padding: "12px 24px", background: "#111", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, whiteSpace: "nowrap" }}
+              className="bg-amber-400 hover:bg-amber-500 text-black font-black px-8 py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap text-base"
             >
-              {loading ? "Analyzing..." : "Scrape & Analyze"}
+              {loading ? (
+                <>
+                  <span className="w-5 h-5 border-3 border-black border-t-transparent rounded-full animate-spin"></span>
+                  <span>Scraping...</span>
+                </>
+              ) : (
+                <>
+                  <span>⚡ Scrape &amp; Analyze</span>
+                </>
+              )}
             </button>
           </div>
-          {error && <p style={{ color: "#dc2626", marginTop: 10, fontSize: 14 }}>{error}</p>}
+
+          {/* Quick links preset samples */}
+          <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+            <span className="font-bold">Try example:</span>
+            <button
+              onClick={() => {
+                setUrl("https://www.homedepot.com");
+                handleScrape("https://www.homedepot.com");
+              }}
+              className="hover:text-black hover:underline"
+            >
+              HomeDepot.com
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => {
+                setUrl("https://www.floorsforlife.com");
+                handleScrape("https://www.floorsforlife.com");
+              }}
+              className="hover:text-black hover:underline"
+            >
+              FloorsForLife.com
+            </button>
+          </div>
+
+          {/* PROGRESS INDICATOR */}
+          {loading && (
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
+              <span className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></span>
+              <p className="text-xs font-bold text-amber-900 tracking-wide">{progressMsg}</p>
+            </div>
+          )}
+
+          {/* ERROR MESSAGE */}
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold flex items-center justify-between">
+              <span>⚠️ {error}</span>
+              <button onClick={() => setError("")} className="text-red-500 hover:text-red-800 font-bold">
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Loading */}
-        {loading && (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#666" }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-            <p style={{ fontWeight: 600 }}>Scraping and analyzing company data...</p>
-            <p style={{ fontSize: 14, color: "#999" }}>This usually takes 5–10 seconds</p>
-          </div>
-        )}
-
-        {/* Results */}
-        {result && !loading && (
-          <div style={{ border: "1px solid #e5e5e5", borderRadius: 12, overflow: "hidden", marginBottom: 40 }}>
-            <div style={{ background: "#111", color: "#fff", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* RESULTS PANEL */}
+        {intel && (
+          <div className="mb-12 bg-white border-2 border-black rounded-2xl p-6 lg:p-8 shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6 mb-6">
               <div>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>{result.companyName}</div>
-                <div style={{ fontSize: 13, opacity: 0.7, marginTop: 2 }}>{result.url}</div>
-              </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button onClick={handleSaveIntel} style={{ padding: "8px 16px", background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  {savedMsg || "Save Profile"}
-                </button>
-                <button onClick={handleUseInOutreach} style={{ padding: "8px 16px", background: "#fff", color: "#111", border: "none", borderRadius: 6, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                  Use in Outreach →
-                </button>
-              </div>
-            </div>
-            <div style={{ padding: 24 }}>
-              {result.tagline && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Tagline / Mission</div>
-                  <p style={{ color: "#333", fontSize: 15, fontStyle: "italic", margin: 0 }}>"{result.tagline}"</p>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-black text-black">{intel.companyName}</h2>
+                  {intel.tone && (
+                    <span className="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full border border-gray-200">
+                      Tone: {intel.tone}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-                {result.services && result.services.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Services</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {result.services.map((s, i) => (
-                        <span key={i} style={{ background: "#f0f0f0", padding: "4px 10px", borderRadius: 20, fontSize: 13, color: "#333" }}>{s}</span>
-                      ))}
-                    </div>
-                  </div>
+                {intel.url && (
+                  <a
+                    href={intel.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-amber-600 hover:underline mt-1 inline-block"
+                  >
+                    🔗 {intel.url}
+                  </a>
                 )}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Profile</div>
-                  <div style={{ fontSize: 14, color: "#555", lineHeight: 1.6 }}>
-                    <div><strong>Audience:</strong> {result.targetAudience || "General"}</div>
-                    <div><strong>Tone:</strong> {result.tone || "Professional"}</div>
-                  </div>
+              </div>
+
+              <button
+                onClick={() => handleUseInOutreach(intel)}
+                className="bg-black text-white hover:bg-gray-800 font-black px-6 py-3 rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-md hover:scale-[1.02]"
+              >
+                <span>✉️ Use in Outreach</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Tagline / Mission */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Tagline / Mission
+                </h3>
+                <p className="text-sm font-semibold text-gray-800 leading-relaxed">
+                  {intel.tagline || intel.description || "No mission description captured."}
+                </p>
+              </div>
+
+              {/* Target Audience */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Target Audience
+                </h3>
+                <p className="text-sm font-semibold text-gray-800 leading-relaxed">
+                  {intel.targetAudience || "B2B & Commercial Clients"}
+                </p>
+              </div>
+            </div>
+
+            {/* Services / Products */}
+            {intel.services && intel.services.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Services / Product Offerings
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {intel.services.map((srv, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-lg text-xs font-bold"
+                    >
+                      ✓ {srv}
+                    </span>
+                  ))}
                 </div>
               </div>
-              {result.highlights && result.highlights.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Key Highlights</div>
-                  <ul style={{ margin: 0, padding: "0 0 0 20px", color: "#333", fontSize: 14, lineHeight: 2 }}>
-                    {result.highlights.map((h, i) => <li key={i}>{h}</li>)}
-                  </ul>
-                </div>
-              )}
-              {result.highlight && (
-                <div style={{ marginTop: 20, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#166534", marginBottom: 4 }}>Outreach Hook (used in emails)</div>
-                  <p style={{ margin: 0, fontSize: 14, color: "#15803d" }}>{result.highlight}</p>
-                </div>
-              )}
-            </div>
+            )}
+
+            {/* Key Highlights */}
+            {intel.highlights && intel.highlights.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Key Company Highlights
+                </h3>
+                <ul className="space-y-2">
+                  {intel.highlights.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 font-medium">
+                      <span className="text-amber-500 font-black">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Saved profiles */}
-        {saved.length > 0 && (
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#111", marginBottom: 16 }}>Saved Company Profiles</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {saved.map((s, i) => (
-                <div key={i} style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* SAVED PROFILES SECTION */}
+        <div className="border-t border-gray-200 pt-8">
+          <h2 className="text-xl font-black mb-4 flex items-center gap-2">
+            <span>📚 Saved Company Profiles</span>
+            <span className="bg-gray-200 text-gray-700 text-xs px-2.5 py-0.5 rounded-full font-bold">
+              {savedIntels.length}
+            </span>
+          </h2>
+
+          {savedIntels.length === 0 ? (
+            <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
+              <p className="text-gray-500 font-semibold text-sm">
+                No saved company profiles yet. Enter a website URL above to generate intelligence.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {savedIntels.map((profile, i) => (
+                <div
+                  key={i}
+                  className="border border-gray-200 rounded-xl p-5 bg-white hover:border-gray-400 transition-all flex flex-col justify-between"
+                >
                   <div>
-                    <div style={{ fontWeight: 600, color: "#111", fontSize: 15 }}>{s.companyName}</div>
-                    <div style={{ fontSize: 13, color: "#999", marginTop: 2 }}>{s.url}</div>
-                    {s.tagline && <div style={{ fontSize: 13, color: "#666", marginTop: 4, fontStyle: "italic" }}>{s.tagline.substring(0, 80)}...</div>}
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-bold text-base text-black">{profile.companyName}</h3>
+                      <button
+                        onClick={() => handleDeleteSaved(profile.url)}
+                        className="text-gray-400 hover:text-red-600 text-xs font-bold"
+                        title="Delete Profile"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                      {profile.tagline || profile.description || profile.url}
+                    </p>
+                    {profile.services && profile.services.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        {profile.services.slice(0, 3).map((s, idx) => (
+                          <span
+                            key={idx}
+                            className="bg-gray-100 text-gray-700 text-[11px] font-semibold px-2 py-0.5 rounded"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => { localStorage.setItem("xts_company_intel", JSON.stringify(s)); window.location.href = "/outreach"; }}
-                      style={{ padding: "7px 14px", background: "#111", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      Use in Outreach
-                    </button>
-                    <button onClick={() => handleDeleteSaved(s.url)}
-                      style={{ padding: "7px 14px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
-                      Delete
+
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <span className="text-[10px] text-gray-400 font-semibold">
+                      {profile.scrapedAt || "Saved Profile"}
+                    </span>
+                    <button
+                      onClick={() => handleUseInOutreach(profile)}
+                      className="bg-amber-400 hover:bg-amber-500 text-black font-bold text-xs px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      Use in Outreach →
                     </button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {saved.length === 0 && !result && !loading && (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#bbb" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🔗</div>
-            <p style={{ fontWeight: 600, color: "#999" }}>No company profiles yet</p>
-            <p style={{ fontSize: 14 }}>Paste a company URL above to get started</p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

@@ -10,7 +10,7 @@ export default function Navbar() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("xts_user");
+      const stored = localStorage.getItem("xts_auth_user") || localStorage.getItem("xts_user");
       if (stored) {
         setUser(JSON.parse(stored));
       }
@@ -20,6 +20,7 @@ export default function Navbar() {
   }, []);
 
   const handleSignOut = () => {
+    localStorage.removeItem("xts_auth_user");
     localStorage.removeItem("xts_user");
     document.cookie = "xts_user=; path=/; max-age=0; SameSite=Lax";
     window.location.href = "/auth";
@@ -28,6 +29,7 @@ export default function Navbar() {
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Saved Leads", href: "/saved" },
+    { label: "CRM", href: "/crm" },
     { label: "Archive", href: "/archive" },
     { label: "Outreach", href: "/outreach" },
   ];
@@ -40,7 +42,7 @@ export default function Navbar() {
         </Link>
         <div className="hidden md:flex items-center gap-6">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href === "/crm" && pathname.startsWith("/crm"));
             return (
               <Link
                 key={item.href}

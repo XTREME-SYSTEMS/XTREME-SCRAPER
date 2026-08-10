@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
+import { CRMContact } from "@/lib/crm";
 
 interface SavedLead {
   id: string;
@@ -21,6 +22,7 @@ export default function SavedPage() {
   const [leads, setLeads] = useState<SavedLead[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("");
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -71,6 +73,57 @@ export default function SavedPage() {
     window.location.href = "/outreach";
   };
 
+  const triggerToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleAddToCRM = (e: React.MouseEvent, lead: SavedLead) => {
+    e.stopPropagation();
+    try {
+      const raw = localStorage.getItem("xts_crm_contacts");
+      const existing: CRMContact[] = raw ? JSON.parse(raw) : [];
+
+      const alreadyExists = existing.some(
+        (c) => c.id === lead.id || (c.name.toLowerCase() === lead.name.toLowerCase() && c.phone === lead.phone)
+      );
+
+      if (alreadyExists) {
+        triggerToast(`"${lead.name}" is already in CRM`);
+        return;
+      }
+
+      const newContact: CRMContact = {
+        id: lead.id || `crm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: lead.name,
+        phone: lead.phone || "",
+        email: lead.email || "",
+        address: lead.address || "",
+        source: lead.source || "Saved Leads",
+        status: "New",
+        priority: "Warm",
+        tags: lead.industry ? [lead.industry] : ["Saved Lead"],
+        notes: lead.stars ? `Rating: ${lead.stars} stars` : "",
+        emailHistory: [],
+        activityLog: [
+          {
+            date: new Date().toISOString(),
+            type: "Created",
+            note: "Added to CRM from Saved Leads"
+          }
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const updated = [newContact, ...existing];
+      localStorage.setItem("xts_crm_contacts", JSON.stringify(updated));
+      triggerToast("Added to CRM");
+    } catch (err) {
+      console.error("Failed to add to CRM", err);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#fff", fontFamily: "Inter, system-ui, sans-serif" }}>
       <Navbar />
@@ -84,6 +137,14 @@ export default function SavedPage() {
             + Search More
           </Link>
         </div>
+
+        {/* Toast */}
+        {toastMsg && (
+          <div className="fixed bottom-6 right-6 z-50 bg-black text-white px-5 py-3 rounded-xl shadow-2xl font-semibold text-sm flex items-center gap-2 border border-yellow-400">
+            <span className="text-yellow-400 font-bold">⚡</span>
+            <span>{toastMsg}</span>
+          </div>
+        )}
 
         {/* Toolbar */}
         {leads.length > 0 && (
@@ -123,7 +184,14 @@ export default function SavedPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
                     <div style={{ fontWeight: 700, fontSize: 16, color: "#111" }}>{lead.name}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <button
+                        onClick={(e) => handleAddToCRM(e, lead)}
+                        className="px-3 py-1 text-xs font-bold rounded-lg border border-black bg-yellow-400 text-black hover:bg-yellow-300 transition-all shadow-sm"
+                        title="Add this lead directly to your CRM"
+                      >
+                        + Add to CRM
+                      </button>
                       {lead.source && <span style={{ background: "#f0f0f0", padding: "3px 10px", borderRadius: 20, fontSize: 12, color: "#555" }}>{lead.source}</span>}
                       {lead.stars && <span style={{ fontSize: 13, color: "#f59e0b" }}>{"★".repeat(Math.round(lead.stars))}</span>}
                     </div>

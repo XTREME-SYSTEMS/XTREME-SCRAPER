@@ -1,62 +1,54 @@
-// AI enhance endpoint — calls OpenAI if key available, otherwise uses smart keyword expansion
 import { NextRequest, NextResponse } from 'next/server';
 
+const BASE44_API_KEY = process.env.BASE44_API_KEY;
+const BASE44_AGENT_ID = process.env.BASE44_AGENT_ID || '6a4ae522852a5e08bfa42450';
+
+async function callBase44AI(prompt: string): Promise<string> {
+  if (!BASE44_API_KEY) throw new Error('No Base44 API key');
+  const res = await fetch(`https://api.base44.com/api/apps/${BASE44_AGENT_ID}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api_key': BASE44_API_KEY },
+    body: JSON.stringify({ message: prompt }),
+  });
+  if (!res.ok) throw new Error(`Base44 error: ${res.status}`);
+  const data = await res.json();
+  return data?.message?.content || data?.content || data?.response || data?.text || '';
+}
+
 export async function POST(req: NextRequest) {
-  const { query } = await req.json();
-  
-  // Smart keyword expansion (works without OpenAI key too)
-  const enhancements: Record<string, string> = {
-    'epoxy': 'epoxy floor coating contractors commercial industrial',
-    'floor': 'flooring contractors commercial residential installation',
-    'paint': 'commercial painting contractors interior exterior',
-    'roof': 'commercial roofing contractors flat metal TPO installation',
-    'concrete': 'concrete polishing grinding coating contractors commercial',
-    'clean': 'commercial janitorial cleaning services office industrial',
-    'plumb': 'commercial plumbing contractors installation repair',
-    'hvac': 'HVAC mechanical contractors commercial industrial installation',
-    'electric': 'electrical contractors commercial industrial licensed',
-    'landscape': 'commercial landscaping contractors maintenance installation',
-    'general': 'general contractors commercial construction renovation',
-    'dental': 'dental offices practices general cosmetic sedation',
-    'account': 'accounting CPA bookkeeping tax preparation firms',
-    'insur': 'commercial business insurance agencies brokers',
-    'gym': 'fitness gyms studios personal training CrossFit',
-    'auto': 'auto repair shops body mechanics certified service',
-    'moving': 'moving companies commercial residential relocation',
-    'staffing': 'staffing temp employment agencies commercial industrial',
-  };
-  
-  const lower = (query || '').toLowerCase();
-  let enhanced = query || '';
-  
-  for (const [key, expansion] of Object.entries(enhancements)) {
-    if (lower.includes(key)) {
-      enhanced = expansion;
-      break;
-    }
-  }
-  
-  // Try OpenAI if key available
-  if (process.env.OPENAI_API_KEY) {
+  try {
+    const { query, city, state } = await req.json();
+
+    const prompt = `You are an expert B2B lead generation specialist. A user is searching for business leads.
+
+Search query: "${query}"
+Location: ${city || 'Unknown'}, ${state || 'Unknown'}
+
+Generate 5 alternative search keyword variations that would help find more relevant businesses. Each should be a specific industry term or variation that someone would search.
+
+Return ONLY a JSON array of 5 strings, nothing else. Example: ["term 1", "term 2", "term 3", "term 4", "term 5"]`;
+
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{
-            role: 'system',
-            content: 'You enhance business search queries to find the best leads. Return ONLY the enhanced search phrase, 5-8 words max, no explanation.'
-          }, {
-            role: 'user', content: `Enhance this search query for finding business leads: "${query}"`
-          }],
-          max_tokens: 30
-        })
-      });
-      const data = await res.json();
-      enhanced = data.choices?.[0]?.message?.content?.trim() || enhanced;
-    } catch {}
+      const aiText = await callBase44AI(prompt);
+      const match = aiText.match(/\[[\s\S]*?\]/);
+      if (match) {
+        const suggestions = JSON.parse(match[0]);
+        return NextResponse.json({ suggestions: suggestions.slice(0, 5) });
+      }
+    } catch { /* fall through to fallback */ }
+
+    // Fallback
+    const base = query.toLowerCase();
+    return NextResponse.json({
+      suggestions: [
+        `${base} near me`,
+        `commercial ${base}`,
+        `professional ${base}`,
+        `${base} company`,
+        `local ${base} services`,
+      ]
+    });
+  } catch (err) {
+    return NextResponse.json({ error: 'AI enhance failed' }, { status: 500 });
   }
-  
-  return NextResponse.json({ enhanced });
 }
