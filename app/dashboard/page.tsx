@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -41,16 +41,176 @@ const CA_PROVINCES = [
   { code: "YT", name: "Yukon" },
 ];
 
-const EXAMPLES = [
-  { query: "Epoxy flooring",       city: "Phoenix",   state: "AZ", country: "US" },
-  { query: "Plumbers",             city: "Dallas",    state: "TX", country: "US" },
-  { query: "Roofing contractors",  city: "Denver",    state: "CO", country: "US" },
-  { query: "Wedding photographers",city: "Austin",    state: "TX", country: "US" },
-  { query: "Accountants",          city: "Chicago",   state: "IL", country: "US" },
-  { query: "HVAC companies",       city: "Miami",     state: "FL", country: "US" },
-  { query: "Concrete contractors", city: "Toronto",   state: "ON", country: "CA" },
-  { query: "Epoxy flooring",       city: "Calgary",   state: "AB", country: "CA" },
+const INDUSTRY_KEYWORDS: string[] = [
+  // FLOORING
+  'epoxy floor contractors', 'polished concrete contractors', 'hardwood floor installers',
+  'tile flooring companies', 'LVP flooring installers', 'vinyl plank flooring contractors',
+  'commercial flooring subcontractors', 'warehouse floor coating companies',
+  'industrial floor resurfacing', 'concrete floor grinding companies',
+  'floor coating applicators', 'decorative concrete contractors',
+  'resinous flooring companies', 'urethane cement flooring',
+  'polyaspartic floor coating contractors', 'self-leveling floor contractors',
+
+  // PAINTING
+  'commercial painting contractors', 'interior painting companies',
+  'exterior painting contractors', 'industrial painting companies',
+  'commercial paint contractors', 'epoxy paint applicators',
+
+  // ROOFING
+  'commercial roofing contractors', 'flat roof contractors',
+  'metal roofing companies', 'TPO roofing contractors',
+  'residential roofing companies', 'roofing subcontractors',
+
+  // CONCRETE / MASONRY
+  'concrete contractors', 'concrete repair companies',
+  'masonry contractors', 'concrete cutting companies',
+  'shotcrete contractors', 'concrete polishing companies',
+
+  // GENERAL CONTRACTING
+  'general contractors', 'commercial general contractors',
+  'construction management companies', 'renovation contractors',
+  'remodeling contractors', 'tenant improvement contractors',
+
+  // PLUMBING
+  'commercial plumbing contractors', 'plumbing companies',
+  'industrial plumbing contractors',
+
+  // HVAC
+  'HVAC contractors', 'commercial HVAC companies',
+  'mechanical contractors', 'refrigeration contractors',
+
+  // ELECTRICAL
+  'electrical contractors', 'commercial electricians',
+  'industrial electrical companies',
+
+  // LANDSCAPING
+  'landscaping companies', 'commercial landscaping contractors',
+  'lawn care companies', 'irrigation contractors',
+
+  // CLEANING
+  'commercial janitorial services', 'office cleaning companies',
+  'industrial cleaning contractors', 'pressure washing companies',
+  'building cleaning services',
+
+  // PHOTOGRAPHY
+  'commercial photographers', 'real estate photographers',
+  'wedding photographers', 'product photographers',
+
+  // ACCOUNTING
+  'accounting firms', 'bookkeeping companies', 'CPA firms',
+  'tax preparation services', 'payroll companies',
+
+  // INSURANCE
+  'insurance agencies', 'commercial insurance brokers',
+  'business insurance companies',
+
+  // LAW
+  'law firms', 'business attorneys', 'construction lawyers',
+
+  // MEDICAL / DENTAL
+  'dental offices', 'dental practices', 'dentists',
+  'chiropractic offices', 'physical therapy clinics',
+
+  // FITNESS
+  'gyms', 'fitness studios', 'personal training studios',
+  'crossfit gyms', 'yoga studios',
+
+  // AUTO
+  'auto repair shops', 'auto body shops', 'car dealerships',
+  'towing companies', 'tire shops',
+
+  // MOVING
+  'moving companies', 'commercial movers', 'storage companies',
+
+  // STAFFING
+  'staffing agencies', 'temp agencies', 'employment agencies',
+
+  // PEST CONTROL
+  'pest control companies', 'exterminating companies',
+
+  // SECURITY
+  'security companies', 'alarm system installers',
+  'commercial security contractors'
 ];
+
+const CATEGORY_TABS = [
+  'Flooring', 'Painting', 'Construction', 'Cleaning',
+  'Professional', 'Medical', 'Auto', 'More'
+];
+
+const CATEGORY_EXAMPLES: Record<string, string[]> = {
+  'Flooring': [
+    'epoxy floor contractors',
+    'polished concrete contractors',
+    'hardwood floor installers',
+    'tile flooring companies',
+    'LVP flooring installers',
+    'vinyl plank flooring contractors',
+    'commercial flooring subcontractors',
+    'warehouse floor coating companies',
+  ],
+  'Painting': [
+    'commercial painting contractors',
+    'interior painting companies',
+    'exterior painting contractors',
+    'industrial painting companies',
+    'commercial paint contractors',
+    'epoxy paint applicators',
+  ],
+  'Construction': [
+    'general contractors',
+    'commercial general contractors',
+    'concrete contractors',
+    'masonry contractors',
+    'commercial roofing contractors',
+    'commercial plumbing contractors',
+    'HVAC contractors',
+    'electrical contractors',
+  ],
+  'Cleaning': [
+    'commercial janitorial services',
+    'office cleaning companies',
+    'industrial cleaning contractors',
+    'pressure washing companies',
+    'building cleaning services',
+    'carpet cleaning contractors',
+  ],
+  'Professional': [
+    'accounting firms',
+    'bookkeeping companies',
+    'CPA firms',
+    'commercial insurance brokers',
+    'law firms',
+    'business attorneys',
+    'staffing agencies',
+  ],
+  'Medical': [
+    'dental offices',
+    'dental practices',
+    'dentists',
+    'chiropractic offices',
+    'physical therapy clinics',
+    'medical clinics',
+  ],
+  'Auto': [
+    'auto repair shops',
+    'auto body shops',
+    'car dealerships',
+    'towing companies',
+    'tire shops',
+    'auto detailing shops',
+  ],
+  'More': [
+    'landscaping companies',
+    'commercial photographers',
+    'real estate photographers',
+    'gyms',
+    'moving companies',
+    'pest control companies',
+    'security companies',
+    'alarm system installers',
+  ],
+};
 
 type Result = {
   company_name: string;
@@ -64,6 +224,11 @@ type Result = {
   rating?: number;
   review_count?: number;
   email?: string;
+  years_in_business?: number | string;
+  yearsInBusiness?: number | string;
+  years_active?: number | string;
+  established_year?: number;
+  founded?: number;
 };
 
 type SearchResponse = {
@@ -83,19 +248,48 @@ type SearchResponse = {
   intelligence?: { intel?: { opener?: string } };
 };
 
+function getYearsInBusiness(r: Result): string | null {
+  const val = r.years_in_business ?? r.yearsInBusiness ?? r.years_active;
+  if (val !== undefined && val !== null && val !== "") {
+    if (typeof val === "number") return `${val} yrs in business`;
+    if (typeof val === "string") {
+      return val.toLowerCase().includes("in business") ? val : `${val} yrs in business`;
+    }
+  }
+  if (r.established_year || r.founded) {
+    const yr = r.established_year || r.founded;
+    const diff = new Date().getFullYear() - Number(yr);
+    if (diff > 0) return `${diff} yrs in business`;
+  }
+  return null;
+}
+
 export default function Dashboard() {
-  const [query,   setQuery]   = useState("");
   const [city,    setCity]    = useState("Phoenix");
   const [country, setCountry] = useState<"US"|"CA">("US");
   const [state,   setState]   = useState("AZ");
   const [mode,    setMode]    = useState("deep");
   const [limit,   setLimit]   = useState(200);
 
-  // Source selector (NEW)
+  // Uncontrolled Search Bar DOM access
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete & AI Enhance State
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  // Categorized Examples State
+  const [activeCategory, setActiveCategory] = useState<string>("Flooring");
+  const [selectedChip, setSelectedChip] = useState<string | null>(null);
+
+  // Source selector
   const [showSources,     setShowSources]     = useState(false);
   const [selectedSources, setSelectedSources] = useState<string[]>(ALL_SOURCES.map(s => s.id));
 
-  // Results
+  // Results & Stats
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState<SearchResponse | null>(null);
   const [error,    setError]    = useState("");
@@ -110,6 +304,17 @@ export default function Dashboard() {
     setState(country === "US" ? "AZ" : "ON");
   }, [country]);
 
+  // Click outside listener to dismiss autocomplete
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const toggleSource = (id: string) => {
     setSelectedSources(prev =>
       prev.includes(id)
@@ -121,7 +326,7 @@ export default function Dashboard() {
   const doSearch = useCallback(async (
     q?: string, c?: string, st?: string, md?: string, ctry?: "US"|"CA"
   ) => {
-    const Q  = q    ?? query;
+    const Q  = q    ?? (searchInputRef.current?.value || "");
     const C  = c    ?? city;
     const ST = st   ?? state;
     const MD = md   ?? mode;
@@ -129,6 +334,7 @@ export default function Dashboard() {
 
     if (!Q.trim()) { setError("Enter a search query"); return; }
     setLoading(true); setError(""); setResult(null);
+    setShowAutocomplete(false);
 
     try {
       const body: Record<string, unknown> = {
@@ -161,11 +367,81 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [query, city, state, mode, limit, country, selectedSources]);
+  }, [city, state, mode, limit, country, selectedSources]);
 
+  // Handle Autocomplete Input
+  const handleSearchInput = () => {
+    const currentVal = searchInputRef.current?.value || "";
+    if (!currentVal.trim()) {
+      setSuggestions([]);
+      setShowAutocomplete(false);
+      return;
+    }
+    const lower = currentVal.toLowerCase();
+    const matches = INDUSTRY_KEYWORDS.filter(kw => kw.toLowerCase().includes(lower));
+    setSuggestions(matches.slice(0, 8));
+    setShowAutocomplete(matches.length > 0);
+  };
+
+  // Handle Keyboard Navigation in Search Input
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      setShowAutocomplete(false);
+    } else if (e.key === "Enter") {
+      setShowAutocomplete(false);
+      doSearch();
+    }
+  };
+
+  // Select Suggestion
+  const handleSelectSuggestion = (kw: string) => {
+    if (searchInputRef.current) {
+      searchInputRef.current.value = kw;
+    }
+    setShowAutocomplete(false);
+    setSelectedChip(kw);
+  };
+
+  // Handle AI Assist
+  const handleAiEnhance = async () => {
+    const currentVal = searchInputRef.current?.value || "";
+    if (!currentVal.trim()) return;
+
+    setIsEnhancing(true);
+    setShowAutocomplete(false);
+    try {
+      const res = await fetch("/api/ai-enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: currentVal }),
+      });
+      const data = await res.json();
+      if (data.enhanced && searchInputRef.current) {
+        searchInputRef.current.value = data.enhanced;
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } catch (err) {
+      console.error("AI Enhance error:", err);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  // Handle Category Chip Click
+  const handleChipClick = (phrase: string) => {
+    if (searchInputRef.current) {
+      searchInputRef.current.value = phrase;
+    }
+    setSelectedChip(phrase);
+    setShowAutocomplete(false);
+  };
+
+  // Export CSV
   const exportCSV = () => {
     const rows = result?.results ?? result?.leads ?? [];
     if (!rows.length) return;
+    const searchQuery = result?.query || searchInputRef.current?.value || "search";
     const csv = [
       "Company Name,Phone,Email,Website,Address,City,State,Rating,Reviews,Source,Confidence",
       ...rows.map(r =>
@@ -180,9 +456,27 @@ export default function Dashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `xtreme-scraper-${query.replace(/\s+/g,"-")}-${city}-${Date.now()}.csv`;
+    a.download = `xtreme-scraper-${searchQuery.replace(/\s+/g,"-")}-${city}-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Highlight text match in autocomplete dropdown
+  const renderHighlighted = (text: string) => {
+    const query = searchInputRef.current?.value || "";
+    if (!query.trim()) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return text;
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + query.length);
+    const after = text.slice(idx + query.length);
+    return (
+      <>
+        {before}
+        <span className="bg-yellow-200 text-black font-extrabold px-0.5 rounded">{match}</span>
+        {after}
+      </>
+    );
   };
 
   const hits  = result?.results ?? result?.leads ?? [];
@@ -192,7 +486,15 @@ export default function Dashboard() {
   }, {});
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-white text-black relative">
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-purple-900 text-white font-bold text-sm px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-purple-500 animate-bounce">
+          <span className="text-lg">✨</span>
+          <span>Enhanced ✓</span>
+        </div>
+      )}
+
       {/* NAV */}
       <nav className="border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 bg-white z-50">
         <span className="font-black text-xl">XTREME SCRAPER</span>
@@ -214,17 +516,63 @@ export default function Dashboard() {
           <span className="font-semibold text-black">Google Maps · BBB · Apollo · Firecrawl · BrowserWorker · AI</span>
         </p>
 
-        {/* ── ROW 1: Query + City + Country + State ── */}
+        {/* ── ROW 1: Query (with AI Assist & Autocomplete) + City + Country + State ── */}
         <div className="flex gap-3 mb-4 flex-wrap">
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && doSearch()}
-            placeholder="Search any industry... (plumbers, photographers, accountants)"
-            className="flex-1 rounded-xl border-2 border-gray-200 px-5 py-3 text-base focus:outline-none focus:border-yellow-400"
-            style={{ minWidth: 260 }}
-          />
+          <div ref={searchContainerRef} className="relative flex-1" style={{ minWidth: 260 }}>
+            <input
+              ref={searchInputRef}
+              id="search-input"
+              type="text"
+              defaultValue=""
+              onInput={handleSearchInput}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                const currentVal = searchInputRef.current?.value || "";
+                if (currentVal.trim()) handleSearchInput();
+              }}
+              placeholder="Search any industry... (plumbers, photographers, accountants)"
+              className="w-full rounded-xl border-2 border-gray-200 pl-5 pr-28 py-3 text-base focus:outline-none focus:border-yellow-400"
+            />
+            {/* AI Assist Button */}
+            <button
+              type="button"
+              onClick={handleAiEnhance}
+              disabled={isEnhancing}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 z-10"
+            >
+              {isEnhancing ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>Enhancing...</span>
+                </>
+              ) : (
+                <>
+                  <span>✨</span>
+                  <span>AI Assist</span>
+                </>
+              )}
+            </button>
+
+            {/* Smart Autocomplete Dropdown */}
+            {showAutocomplete && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden divide-y divide-gray-100">
+                {suggestions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectSuggestion(item)}
+                    className="px-4 py-2.5 text-sm cursor-pointer hover:bg-yellow-50 text-gray-800 flex items-center justify-between"
+                  >
+                    <span>{renderHighlighted(item)}</span>
+                    <span className="text-xs text-gray-400">Industry</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <input
             type="text"
             value={city}
@@ -250,7 +598,7 @@ export default function Dashboard() {
             <button
               onClick={() => setCountry("CA")}
               className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
-              style={{ width: 130, padding: "12px 0", flexShrink: 0,
+              style={{ width: 160, padding: "12px 0", flexShrink: 0,
                 ...(country === "CA"
                   ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
                   : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
@@ -259,148 +607,193 @@ export default function Dashboard() {
               <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
               <span>Canada</span>
             </button>
+          </div>
+
+          {/* State or Province selector */}
+          {country === "US" ? (
             <select
               value={state}
               onChange={e => setState(e.target.value)}
-              className="rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white font-semibold"
-              style={{ minWidth: 140 }}
+              className="w-28 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
             >
-              {country === "US"
-                ? US_STATES.map(s => <option key={s} value={s}>{s}</option>)
-                : CA_PROVINCES.map(p => <option key={p.code} value={p.code}>{p.code} — {p.name}</option>)
-              }
+              {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-          </div>
-        </div>
-
-        {/* ── ROW 2: Modes + Limit ── */}
-        <div className="flex gap-3 mb-4 flex-wrap">
-          {MODES.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className="rounded-xl text-sm font-bold transition-all border-2 text-left"
-              style={{
-                minWidth: 170, padding: "10px 20px", flexShrink: 0,
-                ...(mode === m.id
-                  ? { backgroundColor: m.color, borderColor: m.color, color: "white" }
-                  : { backgroundColor: "white", borderColor: "#E5E7EB", color: "#111" })
-              }}
-            >
-              {m.label} <span className="font-normal opacity-70 text-xs ml-1">{m.desc}</span>
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2">
-            <label className="text-sm text-gray-500">Limit:</label>
+          ) : (
             <select
-              value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
-              className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+              value={state}
+              onChange={e => setState(e.target.value)}
+              className="w-36 rounded-xl border-2 border-gray-200 px-3 py-3 text-base focus:outline-none focus:border-yellow-400 bg-white"
             >
-              {[50, 100, 200, 500, 0].map(n => (
-                <option key={n} value={n}>{n === 0 ? "All" : n}</option>
+              {CA_PROVINCES.map(p => (
+                <option key={p.code} value={p.code}>{p.code} — {p.name}</option>
               ))}
             </select>
-          </div>
-        </div>
-
-        {/* ── SOURCE SELECTOR (NEW) ── */}
-        <div className="mb-5">
-          <button
-            onClick={() => setShowSources(v => !v)}
-            className="flex items-center gap-2 rounded-xl border-2 px-5 py-3 text-sm font-bold transition-all"
-            style={showSources
-              ? { background: "#111", borderColor: "#111", color: "#FFBE00" }
-              : { background: "#FFBE00", borderColor: "#FFBE00", color: "#111" }
-            }
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-            </svg>
-            {selectedSources.length === ALL_SOURCES.length
-              ? "All Sources Active"
-              : `${selectedSources.length} of ${ALL_SOURCES.length} Sources`}
-            <span className="font-black text-base leading-none" style={{ marginLeft: 4 }}>{showSources ? "▲" : "▼"}</span>
-          </button>
-
-          {showSources && (
-            <div className="mt-3 p-5 rounded-xl border-2 border-gray-100 bg-gray-50 grid grid-cols-2 gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }}>
-              {ALL_SOURCES.map(src => {
-                const active = selectedSources.includes(src.id);
-                return (
-                  <label key={src.id} className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() => toggleSource(src.id)}
-                      className="mt-0.5 w-4 h-4"
-                      style={{ accentColor: "#FFBE00" }}
-                    />
-                    <div>
-                      <div className={`text-sm font-bold ${active ? "text-black" : "text-gray-400"}`}>{src.label}</div>
-                      <div className="text-xs text-gray-400">{src.desc}</div>
-                    </div>
-                  </label>
-                );
-              })}
-              <div className="col-span-full border-t border-gray-200 pt-3 flex gap-4">
-                <button
-                  onClick={() => setSelectedSources(ALL_SOURCES.map(s => s.id))}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
-                >Select all</button>
-                <button
-                  onClick={() => setSelectedSources([ALL_SOURCES[0].id])}
-                  className="text-xs font-semibold text-gray-400 hover:underline"
-                >Clear all</button>
-              </div>
-            </div>
           )}
         </div>
 
-        {/* ── SEARCH BUTTON ── */}
-        <button
-          onClick={() => doSearch()}
-          disabled={loading}
-          className="w-full rounded-xl py-4 font-black text-lg text-black transition-all hover:scale-[1.01] disabled:opacity-60"
-          style={{ backgroundColor: "#FFBE00" }}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-3">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
-              Searching {selectedSources.length} source{selectedSources.length > 1 ? "s" : ""}...
-            </span>
-          ) : `Search ${mode.charAt(0).toUpperCase() + mode.slice(1)} →`}
-        </button>
+        {/* ── ROW 2: Mode Selector + Limit + Source Toggle + Submit ── */}
+        <div className="flex gap-3 mb-6 flex-wrap items-center">
+          {/* Mode pills */}
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+            {MODES.map(m => (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  mode === m.id ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"
+                }`}
+              >
+                {m.label}
+                <span className="ml-1.5 text-xs font-normal opacity-70">{m.desc.split("·")[0]}</span>
+              </button>
+            ))}
+          </div>
 
-        {/* ── ERROR ── */}
-        {error && (
-          <div className="mt-4 rounded-xl bg-red-50 border border-red-200 px-5 py-3 text-red-700 text-sm">{error}</div>
+          {/* Limit selector */}
+          <select
+            value={limit}
+            onChange={e => setLimit(Number(e.target.value))}
+            className="rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 bg-white font-semibold"
+          >
+            <option value={50}>50 results</option>
+            <option value={100}>100 results</option>
+            <option value={200}>200 results</option>
+            <option value={500}>500 results</option>
+          </select>
+
+          {/* Sources button */}
+          <button
+            onClick={() => setShowSources(!showSources)}
+            className={`rounded-xl border-2 px-4 py-2 text-sm font-semibold transition-all ${
+              selectedSources.length < ALL_SOURCES.length
+                ? "border-yellow-400 bg-yellow-50 text-black"
+                : "border-gray-200 hover:border-gray-300 text-gray-700"
+            }`}
+          >
+            Sources ({selectedSources.length}/{ALL_SOURCES.length}) {showSources ? "▲" : "▼"}
+          </button>
+
+          {/* SEARCH BUTTON */}
+          <button
+            onClick={() => doSearch()}
+            disabled={loading}
+            style={{ backgroundColor: "#FFBE00" }}
+            className="flex-1 rounded-xl px-8 py-3 text-black font-black text-base hover:opacity-90 transition-opacity disabled:opacity-50 min-w-36 shadow-md"
+          >
+            {loading ? "SEARCHING..." : "SEARCH LEADS →"}
+          </button>
+        </div>
+
+        {/* ── SOURCE SELECTOR PANEL ── */}
+        {showSources && (
+          <div className="mb-6 p-5 rounded-2xl border-2 border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-bold text-sm text-gray-700">Select Data Sources</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedSources(ALL_SOURCES.map(s => s.id))}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Select All
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  onClick={() => setSelectedSources(["google_maps"])}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Google Maps Only
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {ALL_SOURCES.map(src => {
+                const active = selectedSources.includes(src.id);
+                return (
+                  <button
+                    key={src.id}
+                    onClick={() => toggleSource(src.id)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      active
+                        ? "border-yellow-400 bg-white shadow-sm"
+                        : "border-gray-200 bg-gray-100 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm">{src.label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${active ? "bg-yellow-400 text-black" : "bg-gray-200 text-gray-500"}`}>
+                        {active ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{src.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
-        {/* ── EXAMPLES ── */}
-        {!result && !loading && (
-          <div className="mt-8">
-            <p className="text-sm text-gray-400 mb-3">Try an example:</p>
-            <div className="flex flex-wrap gap-2">
-              {EXAMPLES.map((ex, i) => (
+        {/* ── REBUILT CATEGORIZED EXAMPLES SECTION ── */}
+        <div className="mb-8 p-6 rounded-2xl bg-gray-50 border border-gray-200">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              💡 Try an Example Industry
+            </h3>
+            <span className="text-xs text-gray-400">Click any phrase to populate search bar</span>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex flex-wrap gap-1.5 border-b border-gray-200 pb-3 mb-4">
+            {CATEGORY_TABS.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeCategory === cat
+                    ? "bg-black text-white shadow-sm"
+                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Chips Grid */}
+          <div className="flex flex-wrap gap-2">
+            {(CATEGORY_EXAMPLES[activeCategory] || []).map(phrase => {
+              const isSelected = selectedChip === phrase;
+              return (
                 <button
-                  key={i}
-                  onClick={() => {
-                    setQuery(ex.query);
-                    setCity(ex.city);
-                    setCountry(ex.country as "US"|"CA");
-                    setState(ex.state);
-                    setTimeout(() => doSearch(ex.query, ex.city, ex.state, mode, ex.country as "US"|"CA"), 50);
-                  }}
-                  className="rounded-full border border-gray-200 px-4 py-1.5 text-sm hover:border-yellow-400 transition-all font-medium"
+                  key={phrase}
+                  type="button"
+                  onClick={() => handleChipClick(phrase)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                    isSelected
+                      ? "bg-yellow-400 text-black border-yellow-500 font-bold shadow-sm"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-yellow-400 hover:bg-yellow-50"
+                  }`}
                 >
-                  {ex.query} in {ex.city}, {ex.state} {ex.country === "CA" ? "🇨🇦" : ""}
+                  {phrase}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── ERROR DISPLAY ── */}
+        {error && (
+          <div className="p-4 mb-8 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* ── LOADING SPINNER ── */}
+        {loading && (
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-yellow-400 border-t-transparent mb-4"></div>
+            <p className="font-bold text-lg">Scraping {mode.toUpperCase()} mode...</p>
+            <p className="text-sm text-gray-500">Querying all sources in parallel</p>
           </div>
         )}
 
@@ -456,66 +849,80 @@ export default function Dashboard() {
 
             {/* Card grid — matches original 3-col layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {hits.map((r, i) => (
-                <div key={i} className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3
-                      className="font-bold text-base leading-tight flex-1 mr-2"
-                      dangerouslySetInnerHTML={{ __html: r.company_name }}
-                    />
-                    {r.confidence && (
-                      <span
-                        className="text-xs font-bold rounded-full px-2 py-0.5 flex-shrink-0"
-                        style={{
-                          backgroundColor: r.confidence >= 80 ? "#DCFCE7" : r.confidence >= 60 ? "#FEF9C3" : "#F3F4F6",
-                          color: r.confidence >= 80 ? "#16A34A" : r.confidence >= 60 ? "#92400E" : "#6B7280",
-                        }}
-                      >
-                        {r.confidence}%
-                      </span>
+              {hits.map((r, i) => {
+                const yib = getYearsInBusiness(r);
+                return (
+                  <div key={i} className="rounded-2xl border border-gray-200 p-5 bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3
+                        className="font-bold text-base leading-tight flex-1 mr-2"
+                        dangerouslySetInnerHTML={{ __html: r.company_name }}
+                      />
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {r.confidence && (
+                          <span
+                            className="text-xs font-bold rounded-full px-2 py-0.5"
+                            style={{
+                              backgroundColor: r.confidence >= 80 ? "#DCFCE7" : r.confidence >= 60 ? "#FEF9C3" : "#F3F4F6",
+                              color: r.confidence >= 80 ? "#16A34A" : r.confidence >= 60 ? "#92400E" : "#6B7280",
+                            }}
+                          >
+                            {r.confidence}%
+                          </span>
+                        )}
+                        {yib && (
+                          <span className="text-xs font-semibold rounded-full px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200">
+                            {yib}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {r.rating && (
+                      <p className="text-sm text-yellow-600 font-semibold mb-2">
+                        ★ {r.rating} {r.review_count ? `(${r.review_count} reviews)` : ""}
+                      </p>
                     )}
+                    {r.address && <p className="text-sm text-gray-500 mb-3 leading-tight">{r.address}</p>}
+                    <div className="flex gap-2 flex-wrap items-center">
+                      {r.phone && (
+                        <a
+                          href={`tel:${r.phone.replace(/\D/g,"")}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
+                        >
+                          📞 {r.phone}
+                        </a>
+                      )}
+                      {r.website && (
+                        <a
+                          href={r.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
+                        >
+                          🌐 Website
+                        </a>
+                      )}
+                      {r.email ? (
+                        <a
+                          href={`mailto:${r.email}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all text-gray-800"
+                        >
+                          ✉ Email
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-normal text-gray-400 bg-gray-50 border border-gray-100">
+                          ✉ No email listed
+                        </span>
+                      )}
+                      {r.source && (
+                        <span className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold bg-gray-50 text-gray-500">
+                          {r.source}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {r.rating && (
-                    <p className="text-sm text-yellow-600 font-semibold mb-2">
-                      ★ {r.rating} {r.review_count ? `(${r.review_count} reviews)` : ""}
-                    </p>
-                  )}
-                  {r.address && <p className="text-sm text-gray-500 mb-3 leading-tight">{r.address}</p>}
-                  <div className="flex gap-2 flex-wrap">
-                    {r.phone && (
-                      <a
-                        href={`tel:${r.phone.replace(/\D/g,"")}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all"
-                      >
-                        📞 {r.phone}
-                      </a>
-                    )}
-                    {r.website && (
-                      <a
-                        href={r.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all"
-                      >
-                        🌐 Website
-                      </a>
-                    )}
-                    {r.email && (
-                      <a
-                        href={`mailto:${r.email}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold border border-gray-200 hover:border-yellow-400 transition-all"
-                      >
-                        ✉ Email
-                      </a>
-                    )}
-                    {r.source && (
-                      <span className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold bg-gray-50 text-gray-500">
-                        {r.source}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
