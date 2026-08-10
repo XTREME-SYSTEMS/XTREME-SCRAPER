@@ -4,10 +4,9 @@ import Link from "next/link";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MODES = [
-  { id: "quick",  label: "Quick",       desc: "~3s · 40 results",   color: "#16A34A" },
-  { id: "deep",   label: "Deep",        desc: "~15s · 150 results", color: "#2563EB" },
-  { id: "max",    label: "Max",         desc: "~30s · 200 results", color: "#9333EA" },
-  { id: "level5", label: "Level 5 ⚡",  desc: "~60s · 250+ results",color: "#FFBE00" },
+  { id: "quick",  label: "Quick",  desc: "~3s · 40 results",    color: "#16A34A" },
+  { id: "deep",   label: "Deep",   desc: "~15s · 150 results",  color: "#2563EB" },
+  { id: "max",    label: "Max",    desc: "~60s · 250+ results", color: "#9333EA" },
 ];
 
 const ALL_SOURCES = [
@@ -148,7 +147,7 @@ export default function Dashboard() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             industry: Q, city: C, state: ST,
-            mode: MD === "level5" ? "max" : MD,
+            mode: MD === "max" ? "level5" : MD,
             limit, country: CT,
             ...(selectedSources.length < ALL_SOURCES.length ? { sources: selectedSources } : {}),
           }),
@@ -238,22 +237,24 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCountry("US")}
-              className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black border-2 transition-all"
-              style={country === "US"
-                ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
-                : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" }
-              }
+              className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+              style={{ width: 160, padding: "12px 0", flexShrink: 0,
+                ...(country === "US"
+                  ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
+                  : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+              }}
             >
               <span style={{ fontSize: 20, lineHeight: 1 }}>🇺🇸</span>
               <span>United States</span>
             </button>
             <button
               onClick={() => setCountry("CA")}
-              className="flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-black border-2 transition-all"
-              style={country === "CA"
-                ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
-                : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" }
-              }
+              className="flex items-center justify-center gap-2 rounded-xl border-2 transition-all font-black text-sm"
+              style={{ width: 130, padding: "12px 0", flexShrink: 0,
+                ...(country === "CA"
+                  ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
+                  : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+              }}
             >
               <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
               <span>Canada</span>
@@ -278,11 +279,13 @@ export default function Dashboard() {
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
-              className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all border-2"
-              style={mode === m.id
-                ? { backgroundColor: m.color, borderColor: m.color, color: m.id === "level5" ? "#111" : "white" }
-                : { backgroundColor: "white", borderColor: "#E5E7EB", color: "#111" }
-              }
+              className="rounded-xl text-sm font-bold transition-all border-2 text-left"
+              style={{
+                minWidth: 170, padding: "10px 20px", flexShrink: 0,
+                ...(mode === m.id
+                  ? { backgroundColor: m.color, borderColor: m.color, color: "white" }
+                  : { backgroundColor: "white", borderColor: "#E5E7EB", color: "#111" })
+              }}
             >
               {m.label} <span className="font-normal opacity-70 text-xs ml-1">{m.desc}</span>
             </button>
@@ -369,7 +372,7 @@ export default function Dashboard() {
               </svg>
               Searching {selectedSources.length} source{selectedSources.length > 1 ? "s" : ""}...
             </span>
-          ) : `Search ${mode === "level5" ? "⚡ Level 5" : mode.charAt(0).toUpperCase() + mode.slice(1)} →`}
+          ) : `Search ${mode.charAt(0).toUpperCase() + mode.slice(1)} →`}
         </button>
 
         {/* ── ERROR ── */}
