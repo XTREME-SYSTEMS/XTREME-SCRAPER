@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, FormEvent } from "react";
+import { useState, useRef, FormEvent, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams?.get("redirect") || "/dashboard";
@@ -13,7 +13,6 @@ export default function AuthPage() {
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
 
-  // Direct DOM references for form fields (NO React state for input values)
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -23,223 +22,115 @@ export default function AuthPage() {
     setError("");
     setSuccess("");
 
-    // Direct DOM access for field values
     const email = emailRef.current?.value?.trim() || "";
     const password = passwordRef.current?.value || "";
     const name = nameRef.current?.value?.trim() || email.split("@")[0] || "User";
 
-    if (!email || !email.includes("@")) {
-      setError("Please enter a valid email address.");
+    if (!email || !password) {
+      setError("Please fill in all fields.");
       return;
     }
 
-    if (!password || password.length < 4) {
-      setError("Password must be at least 4 characters long.");
-      return;
-    }
-
-    // Get existing accounts from localStorage
-    let accounts: Array<{ email: string; password?: string; name: string; plan: string }> = [];
-    try {
-      const stored = localStorage.getItem("xts_accounts");
-      if (stored) accounts = JSON.parse(stored);
-    } catch {
-      accounts = [];
-    }
-
-    if (tab === "signin") {
-      // Find matching account if accounts exist
-      const existingAccount = accounts.find(
-        (acc) => acc.email.toLowerCase() === email.toLowerCase()
+    if (tab === "signup") {
+      const accounts: { email: string; password: string; name: string }[] = JSON.parse(
+        localStorage.getItem("xts_accounts") || "[]"
       );
-
-      if (existingAccount) {
-        if (existingAccount.password && existingAccount.password !== password) {
-          setError("Incorrect password. Please try again.");
-          return;
-        }
-      } else {
-        // Demo mode: if no account stored yet, save account on initial sign-in
-        accounts.push({ email, password, name, plan: "free" });
-        localStorage.setItem("xts_accounts", JSON.stringify(accounts));
-      }
-
-      const userData = {
-        email,
-        name: existingAccount?.name || name,
-        plan: "free",
-      };
-
-      // Store in localStorage & Cookie
-      localStorage.setItem("xts_user", JSON.stringify(userData));
-      document.cookie = `xts_user=${encodeURIComponent(
-        JSON.stringify(userData)
-      )}; path=/; max-age=2592000; SameSite=Lax`;
-
-      setSuccess("Sign in successful! Redirecting...");
-      setTimeout(() => {
-        window.location.href = redirectTarget;
-      }, 500);
-    } else {
-      // Sign Up Tab
-      const existingAccount = accounts.find(
-        (acc) => acc.email.toLowerCase() === email.toLowerCase()
-      );
-
-      if (existingAccount) {
-        setError("An account with this email already exists. Please sign in.");
+      if (accounts.find((a) => a.email === email)) {
+        setError("Account already exists. Sign in instead.");
         return;
       }
-
-      const newAccount = { email, password, name, plan: "free" };
-      accounts.push(newAccount);
+      accounts.push({ email, password, name });
       localStorage.setItem("xts_accounts", JSON.stringify(accounts));
-
-      const userData = { email, name, plan: "free" };
-      localStorage.setItem("xts_user", JSON.stringify(userData));
-      document.cookie = `xts_user=${encodeURIComponent(
-        JSON.stringify(userData)
-      )}; path=/; max-age=2592000; SameSite=Lax`;
-
-      setSuccess("Account created successfully! Redirecting...");
-      setTimeout(() => {
-        window.location.href = redirectTarget;
-      }, 500);
+      const user = { email, name, plan: "free" };
+      localStorage.setItem("xts_user", JSON.stringify(user));
+      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800`;
+      setSuccess("Account created! Redirecting...");
+      setTimeout(() => router.push(redirectTarget), 800);
+    } else {
+      const accounts: { email: string; password: string; name: string }[] = JSON.parse(
+        localStorage.getItem("xts_accounts") || "[]"
+      );
+      const match = accounts.find((a) => a.email === email && a.password === password);
+      if (!match) {
+        setError("Invalid email or password.");
+        return;
+      }
+      const user = { email: match.email, name: match.name, plan: "free" };
+      localStorage.setItem("xts_user", JSON.stringify(user));
+      document.cookie = `xts_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=604800`;
+      router.push(redirectTarget);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white text-black flex flex-col font-sans">
-      {/* Navigation header */}
-      <nav className="border-b border-gray-100 px-8 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="font-black text-xl tracking-tight text-black flex items-center gap-2">
-          ⚡ XTREME SCRAPER
-        </Link>
-        <Link href="/dashboard" className="text-sm font-semibold text-gray-500 hover:text-black">
-          ← Back to Dashboard
-        </Link>
-      </nav>
+    <div style={{ minHeight: "100vh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, color: "#999", textTransform: "uppercase", marginBottom: 8 }}>Xtreme Scraper</div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111", margin: 0 }}>
+            {tab === "signin" ? "Sign In" : "Create Account"}
+          </h1>
+        </div>
 
-      <div className="flex-1 flex items-center justify-center p-6 bg-gray-50/50">
-        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-xl p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="font-black text-2xl tracking-tight mb-2">
-              Xtreme Scraper — Sign In
-            </h1>
-            <p className="text-sm text-gray-500 font-medium">
-              Access intelligence search, saved leads & outreach tools
-            </p>
-          </div>
-
-          {/* Tab buttons */}
-          <div className="flex rounded-xl bg-gray-100 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setTab("signin");
-                setError("");
-                setSuccess("");
-              }}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                tab === "signin"
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-500 hover:text-black"
-              }`}
-            >
-              Sign In
+        <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid #e5e5e5", marginBottom: 28 }}>
+          {(["signin", "signup"] as const).map((t) => (
+            <button key={t} onClick={() => { setTab(t); setError(""); setSuccess(""); }}
+              style={{ flex: 1, padding: "12px 0", background: tab === t ? "#111" : "#fff", color: tab === t ? "#fff" : "#555", border: "none", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+              {t === "signin" ? "Sign In" : "Create Account"}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab("signup");
-                setError("");
-                setSuccess("");
-              }}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                tab === "signup"
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-500 hover:text-black"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
+          ))}
+        </div>
 
-          {/* Error / Success messages */}
-          {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm font-semibold">
-              {error}
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {tab === "signup" && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>Full Name</label>
+              <input ref={nameRef} type="text" placeholder="Your name" defaultValue=""
+                style={{ width: "100%", padding: "12px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
             </div>
           )}
-          {success && (
-            <div className="mb-4 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold">
-              {success}
-            </div>
-          )}
-
-          {/* Form with Direct DOM Access Inputs */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {tab === "signup" && (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                  Full Name
-                </label>
-                <input
-                  ref={nameRef}
-                  id="auth-name"
-                  type="text"
-                  placeholder="John Doe"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base focus:outline-none focus:border-yellow-400 font-medium"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                Email Address
-              </label>
-              <input
-                ref={emailRef}
-                id="auth-email"
-                type="email"
-                placeholder="you@company.com"
-                required
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base focus:outline-none focus:border-yellow-400 font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                Password
-              </label>
-              <input
-                ref={passwordRef}
-                id="auth-password"
-                type="password"
-                placeholder="••••••••"
-                required
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-base focus:outline-none focus:border-yellow-400 font-medium"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3.5 px-6 rounded-xl font-extrabold text-base text-black transition-all shadow-md hover:brightness-95 mt-2"
-              style={{ backgroundColor: "#FFBE00" }}
-            >
-              {tab === "signin" ? "Sign In →" : "Create Free Account →"}
-            </button>
-          </form>
-
-          {/* Demo account notice */}
-          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-400 font-medium">
-              Demo Auth Layer · Credentials stored in local browser session
-            </p>
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>Email</label>
+            <input ref={emailRef} type="email" placeholder="you@company.com" defaultValue=""
+              style={{ width: "100%", padding: "12px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
           </div>
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6 }}>Password</label>
+            <input ref={passwordRef} type="password" placeholder="••••••••" defaultValue=""
+              style={{ width: "100%", padding: "12px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }} />
+          </div>
+
+          {error && <p style={{ color: "#dc2626", fontSize: 14, margin: 0 }}>{error}</p>}
+          {success && <p style={{ color: "#16a34a", fontSize: 14, margin: 0 }}>{success}</p>}
+
+          <button type="submit"
+            style={{ padding: "13px 0", background: "#111", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 4 }}>
+            {tab === "signin" ? "Sign In" : "Create Account"}
+          </button>
+        </form>
+
+        <p style={{ textAlign: "center", marginTop: 24, fontSize: 14, color: "#999" }}>
+          {tab === "signin" ? "No account? " : "Already have one? "}
+          <button onClick={() => setTab(tab === "signin" ? "signup" : "signin")}
+            style={{ background: "none", border: "none", color: "#111", fontWeight: 600, cursor: "pointer", fontSize: 14, textDecoration: "underline" }}>
+            {tab === "signin" ? "Create one" : "Sign in"}
+          </button>
+        </p>
+
+        <div style={{ marginTop: 32, textAlign: "center" }}>
+          <Link href="/dashboard" style={{ color: "#bbb", fontSize: 13, textDecoration: "none" }}>
+            Continue without account →
+          </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading...</div>}>
+      <AuthForm />
+    </Suspense>
   );
 }

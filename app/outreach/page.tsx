@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
-import { SavedLead } from "@/app/saved/page.tsx";
+
+interface SavedLead { id: string; name: string; phone?: string; address?: string; email?: string; stars?: number; source?: string; industry?: string; }
+
 
 const TEMPLATES = [
   {
@@ -154,7 +156,7 @@ export default function OutreachPage() {
                       className="bg-white border border-gray-200 rounded-xl p-3 text-xs flex items-center justify-between gap-2 shadow-sm"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-gray-900 truncate">{r.company_name}</p>
+                        <p className="font-bold text-gray-900 truncate">{r.name}</p>
                         <p className="text-gray-500 truncate">{r.email || r.phone || "No direct email"}</p>
                       </div>
                       <button

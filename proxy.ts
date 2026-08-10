@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const userCookie = request.cookies.get("xts_user");
   const pathname = request.nextUrl.pathname;
 
-  const protectedRoutes = ["/saved", "/archive", "/outreach"];
+  const protectedRoutes = ["/saved", "/archive", "/outreach", "/company-intel"];
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   );
@@ -20,5 +20,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/saved/:path*", "/archive/:path*", "/outreach/:path*"],
+  matcher: ["/saved/:path*", "/archive/:path*", "/outreach/:path*", "/company-intel/:path*"],
 };
