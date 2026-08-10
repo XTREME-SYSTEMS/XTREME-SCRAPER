@@ -616,7 +616,7 @@ export default function Dashboard() {
                 style={{ width: 160, padding: "12px 0", flexShrink: 0,
                   ...(country === "US"
                     ? { background: "#1D4ED8", borderColor: "#1D4ED8", color: "#fff", boxShadow: "0 2px 8px rgba(29,78,216,0.35)" }
-                    : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+                    : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
                 }}
               >
                 <span style={{ fontSize: 20, lineHeight: 1 }}>🇺🇸</span>
@@ -628,7 +628,7 @@ export default function Dashboard() {
                 style={{ width: 160, padding: "12px 0", flexShrink: 0,
                   ...(country === "CA"
                     ? { background: "#DC2626", borderColor: "#DC2626", color: "#fff", boxShadow: "0 2px 8px rgba(220,38,38,0.35)" }
-                    : { background: "#fff", borderColor: "#D1D5DB", color: "#6B7280" })
+                    : { background: "#f0f0f0", borderColor: "#999", color: "#333", fontWeight: 600 })
                 }}
               >
                 <span style={{ fontSize: 20, lineHeight: 1 }}>🇨🇦</span>
@@ -673,7 +673,7 @@ export default function Dashboard() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-extrabold whitespace-nowrap transition-all ${
                   activeCategory === cat
                     ? "bg-black text-white shadow-sm"
-                    : "bg-white text-gray-600 hover:text-black border border-gray-200"
+                    : "bg-gray-100 text-gray-700 hover:text-black border border-gray-400 font-semibold"
                 }`}
               >
                 {cat}
@@ -693,7 +693,7 @@ export default function Dashboard() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                     isSelected
                       ? "bg-yellow-400 text-black border-yellow-500 shadow-sm"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-yellow-400 hover:bg-yellow-50"
+                      : "bg-gray-100 text-gray-700 border-gray-400 hover:border-yellow-400 hover:bg-yellow-50 font-medium"
                   }`}
                 >
                   {phrase}
@@ -730,7 +730,7 @@ export default function Dashboard() {
               className="flex items-center gap-2 rounded-xl border-2 px-4 py-3 font-bold text-sm transition-all"
               style={{
                 borderColor: selectedSources.length < ALL_SOURCES.length ? "#F59E0B" : "#E5E7EB",
-                backgroundColor: selectedSources.length < ALL_SOURCES.length ? "#FEF3C7" : "#fff",
+                backgroundColor: selectedSources.length < ALL_SOURCES.length ? "#FEF3C7" : "#FFBE00",
                 color: "#111827",
               }}
             >

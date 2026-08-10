@@ -70,7 +70,7 @@ export default function ArchivePage() {
                   <button onClick={() => handleRestore(lead.id)} style={{ padding: "8px 14px", background: "#111", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     Restore
                   </button>
-                  <button onClick={() => handleDelete(lead.id)} style={{ padding: "8px 14px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
+                  <button onClick={() => handleDelete(lead.id)} style={{ padding: "8px 14px", background: "#fee2e2", color: "#dc2626", border: "1px solid #f87171", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                     Delete
                   </button>
                 </div>

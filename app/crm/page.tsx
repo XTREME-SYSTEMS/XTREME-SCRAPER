@@ -326,7 +326,7 @@ export default function CRMDashboard() {
 
             <button
               onClick={() => exportContactsToCSV(filteredContacts)}
-              className="px-4 py-2.5 rounded-xl font-bold text-sm border border-gray-300 text-gray-800 bg-white hover:bg-gray-50 transition-all shadow-sm"
+              className="px-4 py-2.5 rounded-xl font-bold text-sm border border-gray-400 text-gray-800 bg-gray-100 hover:bg-gray-200 transition-all shadow-sm"
             >
               Export CSV
             </button>
@@ -392,7 +392,7 @@ export default function CRMDashboard() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:outline-none text-gray-700"
+              className="px-3 py-2 rounded-xl border border-gray-400 text-xs font-bold bg-gray-100 focus:outline-none text-gray-700"
             >
               <option value="all">All Statuses</option>
               {PIPELINE_COLUMNS.map((col) => (
@@ -406,7 +406,7 @@ export default function CRMDashboard() {
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:outline-none text-gray-700"
+              className="px-3 py-2 rounded-xl border border-gray-400 text-xs font-bold bg-gray-100 focus:outline-none text-gray-700"
             >
               <option value="all">All Priorities</option>
               <option value="Hot">Hot Priority</option>
@@ -419,7 +419,7 @@ export default function CRMDashboard() {
               <select
                 value={tagFilter}
                 onChange={(e) => setTagFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white focus:outline-none text-gray-700"
+                className="px-3 py-2 rounded-xl border border-gray-400 text-xs font-bold bg-gray-100 focus:outline-none text-gray-700"
               >
                 <option value="all">All Tags</option>
                 {allTags.map((t) => (

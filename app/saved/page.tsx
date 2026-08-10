@@ -157,17 +157,17 @@ export default function SavedPage() {
               onChange={() => setFilter(filterRef.current?.value || "")}
               style={{ padding: "9px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, outline: "none", minWidth: 200 }}
             />
-            <button onClick={selectAll} style={{ padding: "9px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#fff" }}>Select All</button>
-            <button onClick={clearAll} style={{ padding: "9px 14px", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#fff" }}>Clear</button>
+            <button onClick={selectAll} style={{ padding: "9px 14px", border: "1px solid #FFBE00", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#FFBE00", fontWeight: 600, color: "#111" }}>Select All</button>
+            <button onClick={clearAll} style={{ padding: "9px 14px", border: "1px solid #999", borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#f0f0f0", fontWeight: 600, color: "#333" }}>Clear</button>
             {selected.size > 0 && (
               <>
                 <button onClick={handleEmailSelected} style={{ padding: "9px 16px", background: "#111", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   Email Selected ({selected.size}) →
                 </button>
-                <button onClick={handleArchive} style={{ padding: "9px 16px", background: "#fff", color: "#555", border: "1px solid #ddd", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>
+                <button onClick={handleArchive} style={{ padding: "9px 16px", background: "#e8e8e8", color: "#333", border: "1px solid #bbb", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   Archive ({selected.size})
                 </button>
-                <button onClick={handleDelete} style={{ padding: "9px 16px", background: "#fff", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>
+                <button onClick={handleDelete} style={{ padding: "9px 16px", background: "#fee2e2", color: "#dc2626", border: "1px solid #f87171", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   Delete ({selected.size})
                 </button>
               </>

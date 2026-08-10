@@ -118,7 +118,7 @@ export default function OutreachPage() {
               </button>
               <Link
                 href="/saved"
-                className="px-5 py-2.5 rounded-xl font-bold text-sm border border-green-300 text-green-900 bg-white hover:bg-green-50 transition-all"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm border border-green-600 text-white bg-green-600 hover:bg-green-700 transition-all"
               >
                 Return to Saved Leads
               </Link>
@@ -188,7 +188,7 @@ export default function OutreachPage() {
                         key={idx}
                         type="button"
                         onClick={() => applyTemplate(tpl)}
-                        className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-yellow-50 hover:border-yellow-400 text-xs font-bold text-gray-700 transition-all"
+                        className="px-3 py-1.5 rounded-lg border border-gray-400 bg-gray-100 hover:bg-yellow-50 hover:border-yellow-400 text-xs font-bold text-gray-700 transition-all"
                       >
                         ⚡ {tpl.name}
                       </button>
