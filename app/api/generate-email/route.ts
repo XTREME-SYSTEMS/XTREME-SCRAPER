@@ -17,12 +17,36 @@ async function callBase44AI(prompt: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { lead, template, tone } = await req.json();
-    const name = lead?.name || 'Business';
-    const phone = lead?.phone || '';
-    const address = lead?.address || 'your area';
+    const body = await req.json();
 
-    const prompt = `Write a ${tone || 'professional'} B2B cold outreach email for this lead.
+    // Support two call signatures:
+    // 1. Bulk outreach: { subject, company_name, city, context }
+    // 2. Single lead:  { lead, template, tone }
+    let prompt: string;
+    let fallbackSubject: string;
+    let fallbackBody: string;
+
+    if (body.subject !== undefined || body.company_name !== undefined) {
+      // Bulk outreach AI generate
+      const subject = body.subject || 'Partnership opportunity';
+      const company = body.company_name || '{company_name}';
+      const city = body.city || '{city}';
+      prompt = `Write a professional, concise cold outreach email.
+Subject line: "${subject}"
+Company name placeholder: ${company}
+City placeholder: ${city}
+Instructions: ${body.context || 'Write a compelling, short cold email under 120 words. Use {company_name} and {city} as placeholders where relevant. Do not use filler opener phrases like "I hope this email finds you well". Be direct and value-focused.'}
+
+Return ONLY the email body text. No subject line. No labels. Just the body.`;
+      fallbackSubject = subject;
+      fallbackBody = `Hi Team at {company_name},\n\nWe help service businesses in {city} acquire more high-intent commercial clients without upfront cost.\n\nWould you be open to a brief 5-minute call this week?\n\nBest regards,\n[Your Name]`;
+    } else {
+      // Single lead format
+      const { lead, template, tone } = body;
+      const name = lead?.name || 'Business';
+      const phone = lead?.phone || '';
+      const address = lead?.address || 'your area';
+      prompt = `Write a ${tone || 'professional'} B2B cold outreach email for this lead.
 
 Business: ${name}
 Location: ${address}
@@ -33,22 +57,32 @@ Format exactly as:
 SUBJECT: [subject]
 BODY:
 [body - 3-4 paragraphs, personalized, no filler phrases]`;
+      fallbackSubject = `Quick question about ${name}`;
+      fallbackBody = `Hi ${name} Team,\n\nI came across your business in ${address} and wanted to reach out directly.\n\nWe help local businesses like yours connect with high-intent commercial clients in your area.\n\nWould a quick 5-minute call work this week?\n\nBest,\n[Your Name]`;
+    }
 
     try {
       const aiText = await callBase44AI(prompt);
-      const subjectMatch = aiText.match(/SUBJECT:\s*(.+)/i);
-      const bodyMatch = aiText.match(/BODY:\s*([\s\S]+)/i);
-      return NextResponse.json({
-        subject: subjectMatch ? subjectMatch[1].trim() : `Reaching out to ${name}`,
-        body: bodyMatch ? bodyMatch[1].trim() : aiText
-      });
+
+      if (body.subject !== undefined || body.company_name !== undefined) {
+        // Bulk outreach — return just the body
+        return NextResponse.json({ body: aiText.trim() || fallbackBody });
+      } else {
+        // Single lead — parse subject + body
+        const subjectMatch = aiText.match(/SUBJECT:\s*(.+)/i);
+        const bodyMatch = aiText.match(/BODY:\s*([\s\S]+)/i);
+        return NextResponse.json({
+          subject: subjectMatch ? subjectMatch[1].trim() : fallbackSubject,
+          body: bodyMatch ? bodyMatch[1].trim() : aiText
+        });
+      }
     } catch {
       return NextResponse.json({
-        subject: `Quick question about ${name}`,
-        body: `Hi ${name} Team,\n\nI came across your business in ${address} and wanted to reach out directly.\n\nWe help local businesses like yours connect with high-intent commercial clients in your area. No upfront cost — we only send you verified inquiries.\n\nWould a quick 5-minute call work this week?\n\nBest,\n[Your Name]`
+        subject: fallbackSubject,
+        body: fallbackBody
       });
     }
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Email generation failed' }, { status: 500 });
   }
 }

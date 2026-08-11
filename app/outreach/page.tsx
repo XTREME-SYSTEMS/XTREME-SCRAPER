@@ -668,9 +668,39 @@ function OutreachPageInner() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                          Email Body
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">
+                            Email Body
+                          </label>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!subjectRef.current?.value) return;
+                              const aiBtn = document.getElementById("ai-gen-btn");
+                              if (aiBtn) { aiBtn.textContent = "⚡ Generating..."; aiBtn.setAttribute("disabled","true"); }
+                              try {
+                                const res = await fetch("/api/generate-email", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    subject: subjectRef.current?.value || "",
+                                    company_name: recipients[0]?.name || "{company_name}",
+                                    city: recipients[0]?.city || "{city}",
+                                    context: "Write a professional, concise cold outreach email for a lead generation and local service provider growth company. Use the subject line as the hook. Keep it under 120 words. Use the placeholders {company_name} and {city} where applicable."
+                                  })
+                                });
+                                const data = await res.json();
+                                if (data.body && bodyRef.current) bodyRef.current.value = data.body;
+                              } catch(e) {}
+                              if (aiBtn) { aiBtn.textContent = "⚡ AI Generate"; aiBtn.removeAttribute("disabled"); }
+                            }}
+                            id="ai-gen-btn"
+                            className="text-xs font-bold px-3 py-1 rounded-lg text-black transition-all hover:brightness-95"
+                            style={{backgroundColor:"#FFBE00"}}
+                          >
+                            ⚡ AI Generate
+                          </button>
+                        </div>
                         <textarea
                           ref={bodyRef}
                           id="outreach-body"
