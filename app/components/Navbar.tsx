@@ -36,7 +36,7 @@ export default function Navbar() {
           return;
         }
         const data = await res.json();
-        if (data.ok === false || (data.total_runs === null && data.total_leads === null)) {
+        if (data.ok === false) {
           setSiteStatus("degraded");
         } else {
           setSiteStatus("operational");
