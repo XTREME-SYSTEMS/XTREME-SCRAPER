@@ -171,7 +171,7 @@ export default function SavedPage() {
                 <button onClick={handleEmailSelected} style={{ padding: "9px 16px", background: "#111", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   Email Selected ({selected.size}) →
                 </button>
-                <button onClick={handleArchive} style={{ padding: "9px 16px", background: "#e8e8e8", color: "#333", border: "1px solid #bbb", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={handleArchive} style={{ padding: "9px 16px", background: "#d1d5db", color: "#1f2937", border: "1px solid #9ca3af", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   Archive ({selected.size})
                 </button>
                 <button onClick={handleDelete} style={{ padding: "9px 16px", background: "#fee2e2", color: "#dc2626", border: "1px solid #f87171", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>

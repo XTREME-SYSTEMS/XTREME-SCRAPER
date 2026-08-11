@@ -770,7 +770,7 @@ export default function Dashboard() {
         {/* ── ROW 2: Mode + Sources Button + Limit + Search CTA ── */}
         <div className="flex gap-3 items-center mb-8 flex-wrap">
           {/* Mode pills */}
-          <div className="flex rounded-xl border-2 border-gray-200 p-1 bg-white">
+          <div className="flex rounded-xl border-2 border-gray-200 p-1 bg-gray-100">
             {MODES.map(m => (
               <button
                 key={m.id}
@@ -1063,7 +1063,7 @@ export default function Dashboard() {
                           className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${
                             isSaved
                               ? "bg-green-50 text-green-700 border-green-200 cursor-default"
-                              : "bg-white hover:bg-yellow-50 text-gray-700 border-gray-200 hover:border-yellow-400"
+                              : "bg-gray-100 hover:bg-yellow-50 text-gray-800 border-gray-300 hover:border-yellow-400 font-semibold"
                           }`}
                         >
                           {isSaved ? "Saved ✓" : "💾 Save"}

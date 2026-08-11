@@ -382,7 +382,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={loadAnalyticsData}
-              className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-300 hover:border-black bg-white transition-all flex items-center gap-1.5 shadow-sm"
+              className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-300 hover:border-black bg-gray-100 hover:bg-gray-200 text-gray-800 transition-all flex items-center gap-1.5 shadow-sm"
             >
               <span>🔄 Refresh Data</span>
             </button>

@@ -121,7 +121,7 @@ export default function Navbar() {
             </span>
             <button
               onClick={handleSignOut}
-              className="text-sm font-bold text-gray-600 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3.5 py-1.5 rounded-xl transition-all bg-white"
+              className="text-sm font-bold text-gray-700 hover:text-red-600 border border-gray-300 hover:border-red-300 px-3.5 py-1.5 rounded-xl transition-all bg-gray-100 hover:bg-red-50"
             >
               Sign Out
             </button>

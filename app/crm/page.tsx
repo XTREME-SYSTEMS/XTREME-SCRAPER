@@ -1015,7 +1015,7 @@ export default function CRMDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-bold border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 rounded-xl text-sm font-bold border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all"
                 >
                   Cancel
                 </button>

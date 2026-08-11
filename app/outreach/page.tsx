@@ -626,7 +626,7 @@ function OutreachPageInner() {
                             key={idx}
                             type="button"
                             onClick={() => applyTemplate(tpl)}
-                            className="px-3 py-1.5 rounded-lg border border-gray-300 bg-gray-50 hover:bg-yellow-50 hover:border-yellow-400 text-xs font-bold text-gray-700 transition-all"
+                            className="px-3 py-1.5 rounded-lg border border-gray-300 bg-gray-100 hover:bg-yellow-50 hover:border-yellow-400 text-xs font-bold text-gray-800 transition-all"
                           >
                             ⚡ {tpl.name}
                           </button>
@@ -743,7 +743,7 @@ function OutreachPageInner() {
                 {sentHistory.length > 0 && (
                   <button
                     onClick={clearSentHistory}
-                    className="px-3 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-all"
+                    className="px-3 py-2 rounded-xl border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 text-xs font-bold transition-all"
                   >
                     Clear Log
                   </button>

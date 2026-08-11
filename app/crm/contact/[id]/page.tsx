@@ -554,7 +554,7 @@ export default function ContactDetailPage({
                 <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                   <button
                     onClick={handleCopyEmail}
-                    className="px-4 py-2 rounded-xl font-bold text-xs border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-all"
+                    className="px-4 py-2 rounded-xl font-bold text-xs border border-gray-300 text-gray-700 bg-gray-100 hover:bg-gray-200 transition-all"
                   >
                     Copy to Clipboard
                   </button>
