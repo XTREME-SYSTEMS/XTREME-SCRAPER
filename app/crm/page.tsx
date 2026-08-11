@@ -750,6 +750,11 @@ export default function CRMDashboard() {
                       );
                       updateContactsState(updated);
                       setSelectedContact((prev) => prev ? { ...prev, status: newStatus } : null);
+                      // Auto-schedule Day 3/7/14 follow-ups when set to Contacted
+                      if (newStatus === "Contacted") {
+                        scheduleFollowUps(selectedContact.id, selectedContact.name, selectedContact.phone);
+                        triggerToast("Follow-ups scheduled: Day 3, 7, 14 ✅");
+                      }
                     }}
                     className="w-full px-3 py-2 rounded-xl border border-gray-300 text-xs font-bold bg-white"
                   >

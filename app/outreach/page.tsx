@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
 
@@ -47,7 +48,7 @@ const TEMPLATES = [
   },
 ];
 
-export default function OutreachPage() {
+function OutreachPageInner() {
   const [recipients, setRecipients] = useState<SavedLead[]>([]);
   const [sentCount, setSentCount] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"compose" | "history">("compose");
@@ -63,6 +64,78 @@ export default function OutreachPage() {
   // Sent History state
   const [sentHistory, setSentHistory] = useState<OutreachLogEntry[]>([]);
   const [historySearch, setHistorySearch] = useState("");
+
+  // ── Custom template builder ──
+  const [customTemplates, setCustomTemplates] = useState<{name:string;subject:string;body:string}[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("xts_templates") || "[]"); } catch { return []; }
+  });
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+
+  const saveCurrentAsTemplate = () => {
+    const subject = subjectRef.current?.value || "";
+    const body = bodyRef.current?.value || "";
+    const name = newTemplateName.trim();
+    if (!name || !subject) { addToast("error", "Name and subject required"); return; }
+    const updated = [...customTemplates, { name, subject, body }];
+    setCustomTemplates(updated);
+    localStorage.setItem("xts_templates", JSON.stringify(updated));
+    setNewTemplateName("");
+    setShowSaveTemplate(false);
+    addToast("success", `Template "${name}" saved!`);
+  };
+
+  const deleteCustomTemplate = (idx: number) => {
+    const updated = customTemplates.filter((_, i) => i !== idx);
+    setCustomTemplates(updated);
+    localStorage.setItem("xts_templates", JSON.stringify(updated));
+    addToast("info", "Template deleted");
+  };
+
+  // ── Company Intel context ──
+  const [companyIntelContext, setCompanyIntelContext] = useState<{name?:string;url?:string;hook?:string} | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const intelRaw = localStorage.getItem("xts_company_intel");
+      if (intelRaw) {
+        const intel = JSON.parse(intelRaw);
+        setCompanyIntelContext(intel);
+        localStorage.removeItem("xts_company_intel");
+      }
+    } catch {}
+  }, []);
+
+
+  // Pre-populate from FollowUpQueue "Send Now" link (?contact=&phone=&template=)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const contactParam = searchParams.get("contact");
+    const phoneParam = searchParams.get("phone");
+    const templateParam = searchParams.get("template");
+    if (contactParam) {
+      // Add as a recipient
+      const preloaded: SavedLead = {
+        id: `followup-${Date.now()}`,
+        name: contactParam,
+        phone: phoneParam || "",
+      };
+      setRecipients([preloaded]);
+    }
+    if (templateParam) {
+      // Find matching template and apply it
+      const match = TEMPLATES.find(t => t.name === templateParam);
+      if (match && subjectRef.current && bodyRef.current) {
+        subjectRef.current.value = match.subject;
+        bodyRef.current.value = match.body;
+      } else if (subjectRef.current) {
+        subjectRef.current.value = templateParam;
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Toast notification system
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -502,11 +575,51 @@ export default function OutreachPage() {
                   <div>
                     <h2 className="font-bold text-lg text-gray-900 mb-4">Compose Campaign</h2>
 
+
+                    {/* Company Intel Context Banner */}
+                    {companyIntelContext && (
+                      <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+                        <span className="text-blue-500 text-lg">🏢</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-blue-800">Company Intelligence Loaded</p>
+                          <p className="text-xs text-blue-700 truncate">{companyIntelContext.name || companyIntelContext.url} — email pre-personalized with scraped hook</p>
+                        </div>
+                        <button onClick={() => setCompanyIntelContext(null)} className="text-blue-400 hover:text-blue-600 text-xs">✕</button>
+                      </div>
+                    )}
                     {/* Templates selection */}
                     <div className="mb-5">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                        Quick Templates
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                          Templates
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                          className="text-xs font-bold px-2.5 py-1 rounded-lg border border-yellow-400 text-yellow-700 hover:bg-yellow-50 transition-all"
+                        >
+                          {showSaveTemplate ? "✕ Cancel" : "+ Save Current"}
+                        </button>
+                      </div>
+                      {showSaveTemplate && (
+                        <div className="flex gap-2 mb-3">
+                          <input
+                            type="text"
+                            value={newTemplateName}
+                            onChange={e => setNewTemplateName(e.target.value)}
+                            placeholder="Template name..."
+                            className="flex-1 px-3 py-1.5 rounded-lg border-2 border-yellow-400 text-xs focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={saveCurrentAsTemplate}
+                            className="px-4 py-1.5 rounded-lg text-xs font-bold text-black"
+                            style={{background:"#FFBE00"}}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         {TEMPLATES.map((tpl, idx) => (
                           <button
@@ -517,6 +630,23 @@ export default function OutreachPage() {
                           >
                             ⚡ {tpl.name}
                           </button>
+                        ))}
+                        {customTemplates.map((tpl, idx) => (
+                          <div key={`custom-${idx}`} className="flex items-center gap-1 rounded-lg border border-yellow-300 bg-yellow-50 px-2 py-1">
+                            <button
+                              type="button"
+                              onClick={() => applyTemplate(tpl)}
+                              className="text-xs font-bold text-yellow-800"
+                            >
+                              ★ {tpl.name}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteCustomTemplate(idx)}
+                              className="text-gray-400 hover:text-red-500 text-xs ml-1"
+                              title="Delete template"
+                            >✕</button>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -687,5 +817,13 @@ export default function OutreachPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function OutreachPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-gray-400 text-sm">Loading...</div>}>
+      <OutreachPageInner />
+    </Suspense>
   );
 }

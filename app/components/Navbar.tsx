@@ -65,6 +65,8 @@ export default function Navbar() {
     { label: "CRM", href: "/crm" },
     { label: "Archive", href: "/archive" },
     { label: "Outreach", href: "/outreach" },
+    { label: "Analytics", href: "/analytics" },
+    { label: "Intel", href: "/company-intel" },
   ];
 
   const statusColor =
