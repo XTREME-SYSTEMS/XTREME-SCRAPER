@@ -119,10 +119,10 @@ export default function CompanyIntelPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white text-black font-sans">
+    <div className="min-h-screen bg-white text-black font-sans">
       <Navbar />
 
-      <main className="flex-1 p-8 lg:p-12 overflow-y-auto max-w-6xl mx-auto">
+      <main className="max-w-6xl mx-auto px-4 py-8 lg:px-8 lg:py-12">
         {/* HEADER */}
         <div className="mb-8 border-b border-gray-100 pb-6">
           <div className="flex items-center gap-3 mb-2">
